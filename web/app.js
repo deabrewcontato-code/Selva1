@@ -17,7 +17,20 @@
   const SVGNS = "http://www.w3.org/2000/svg";
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const pad3 = (n) => String(n).padStart(3, "0");
-  const mem = {
+  /* in a DAW the panel runs in the plugin's web view: no Web Audio, the plugin plays; messages go both ways */
+  const PLUGIN = window.SELVA1_HOST === "plugin";
+  const KV = {};                             /* the plugin's store (user sounds, favourites), filled at "init" */
+  const bridge = {
+    send(m) { const b = window.__JUCE__ && window.__JUCE__.backend; if (b) b.emitEvent("s1", m); },
+    listen(fn) {
+      const go = () => { const b = window.__JUCE__ && window.__JUCE__.backend; if (b) b.addEventListener("s1", fn); else setTimeout(go, 50); };
+      go();
+    },
+  };
+  const mem = PLUGIN ? {
+    get(k) { return k in KV ? KV[k] : null; },
+    set(k, v) { KV[k] = v; if (k !== "selva1.last") bridge.send({ t: "kv", k, v }); },
+  } : {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private window: fine */ } },
   };
@@ -107,13 +120,21 @@
   let ctx = null, node = null, starting = null, UI = null;
   let pending = [];
   const held = new Map();                    /* notes held by the panel, the keyboard, MIDI: note -> velocity */
+  let remote = false;                        /* applying values that came from the plugin: do not send them back */
   function send(i, v) {
-    if (!node) return;
+    if (remote || !(node || PLUGIN)) return;
     pending.push(i, v);
     if (pending.length === 2) queueMicrotask(flush);
   }
-  function flush() { if (node && pending.length) node.port.postMessage({ t: "set", a: pending }); pending = []; }
-  function post(m) { if (node) node.port.postMessage(m); }
+  function flush() {
+    if (pending.length) {
+      if (PLUGIN) bridge.send({ t: "set", a: pending });
+      else if (node) node.port.postMessage({ t: "set", a: pending });
+    }
+    pending = [];
+  }
+  function post(m) { if (PLUGIN) bridge.send(m); else if (node) node.port.postMessage(m); }
+  function setRemote(i, v) { remote = true; loading = true; set(i, v); loading = false; remote = false; }
   function sendAll() {
     const a = [];
     for (let i = 0; i < NALL; i++) a.push(i, VALUES[i]);
@@ -131,6 +152,7 @@
     throw err;
   }
   function startAudio() {
+    if (PLUGIN) return Promise.resolve();
     if (ctx && node) {
       if (ctx.state !== "running") ctx.resume().then(powerLabel, powerLabel);
       return Promise.resolve();
@@ -306,7 +328,8 @@
   }
 
   /* ------------------------------------------------------------------ controls --- */
-  const SIZES = { S: 36, M: 46, L: 60 };
+  const SIZES = PLUGIN ? { S: 28, M: 36, L: 48 } : { S: 36, M: 46, L: 60 };
+  const HT = (web, plug) => (PLUGIN ? plug : web);
   const KNOBS = new Map();                   /* key -> [knob] */
   let knobSeed = 1;
   function knob(el, p) {
@@ -367,13 +390,19 @@
       el.setPointerCapture(idp);
       y0 = e.clientY; n0 = get();
       el.classList.add("drag");
+      if (PLUGIN && p && p.id < SEQ0) bridge.send({ t: "g", id: p.id, s: 1 });
     });
     el.addEventListener("pointermove", (e) => {
       if (e.pointerId !== idp) return;
       const d = (y0 - e.clientY) * (e.shiftKey ? sens * 0.2 : sens);
       put(clamp(n0 + d, 0, 1));
     });
-    const end = (e) => { if (e.pointerId !== idp) return; idp = null; el.classList.remove("drag"); };
+    const end = (e) => {
+      if (e.pointerId !== idp) return;
+      idp = null;
+      el.classList.remove("drag");
+      if (PLUGIN && p && p.id < SEQ0) bridge.send({ t: "g", id: p.id, s: 0 });
+    };
     el.addEventListener("pointerup", end);
     el.addEventListener("pointercancel", end);
     el.addEventListener("wheel", (e) => {
@@ -522,7 +551,7 @@
       <div class="mh"><span class="no">${L}</span><h2>Osc</h2><button class="led" data-k="${pre}on" aria-label="Oscilador ${L} ligado"></button>
         <span class="sp"></span><div class="mtabs" data-k="${pre}mode"></div></div>
       <div class="body page">
-        <div class="screen oscscreen"><canvas height="122"></canvas>
+        <div class="screen oscscreen"><canvas height="${HT(122, 74)}"></canvas>
           <button class="nav l" type="button" aria-label="Anterior">&#8249;</button><button class="nav r" type="button" aria-label="Próximo">&#8250;</button>
           <div class="cap"><span class="cn"></span><b class="cm"></b></div>
           <div class="tr"><span class="frame lbl"></span><select class="sel" data-k="${pre}wave" aria-label="Forma de onda"></select>
@@ -726,6 +755,7 @@
   }
   function filterWire() {
     fltCv = $("#fltc");
+    if (PLUGIN) fltCv.setAttribute("height", "66");
     fixHeight(fltCv);
     ["flt.on", "flt.cutoff", "flt.res", "flt.type", "flt.slope", "flt.mode"].forEach((k) => on(id(k), () => later(drawFilter)));
     let idp = null;
@@ -758,8 +788,9 @@
     for (let k = 1; k <= 3; k++) {
       const d = document.createElement("div");
       d.className = "page";
-      d.hidden = k !== 1;
-      d.innerHTML = `<div class="screen"><canvas height="104"></canvas><div class="tr lbl">${k === 1 ? "AMP" : "MOD"}</div></div>
+      d.hidden = k !== 1 && !PLUGIN;
+      d.innerHTML = `<div class="ph"><span class="lbl">ENV ${k}${k === 1 ? " · AMP" : ""}</span><span class="drag" data-src="ENV ${k}"></span></div>
+        <div class="screen"><canvas height="${HT(104, 96)}"></canvas><div class="tr lbl">${k === 1 ? "AMP" : "MOD"}</div></div>
         <div class="oscrow"><div class="knob" data-k="env${k}.a" data-label="ATTACK"></div><div class="knob" data-k="env${k}.d" data-label="DECAY"></div>
         <div class="knob" data-k="env${k}.s" data-label="SUSTAIN"></div><div class="knob" data-k="env${k}.r" data-label="RELEASE"></div></div>`;
       box.appendChild(d);
@@ -847,8 +878,9 @@
     for (let k = 1; k <= 3; k++) {
       const d = document.createElement("div");
       d.className = "page";
-      d.hidden = k !== 1;
-      d.innerHTML = `<div class="screen"><canvas height="78"></canvas><div class="tr lbl lrate"></div></div>
+      d.hidden = k !== 1 && !PLUGIN;
+      d.innerHTML = `<div class="ph"><span class="lbl">LFO ${k}</span><span class="drag" data-src="LFO ${k}"></span></div>
+        <div class="screen"><canvas height="${HT(78, 70)}"></canvas><div class="tr lbl lrate"></div></div>
         <div class="ctl"><div class="seg" data-k="lfo${k}.shape" data-icons="lfo"></div></div>
         <div class="oscrow"><div class="knob" data-k="lfo${k}.rate" data-label="RATE"></div>
           <label class="stack"><span class="lbl">SYNC</span><select class="sel" data-k="lfo${k}.sync"></select></label>
@@ -1213,7 +1245,8 @@
     if (n < 0 || n > 127) return;
     held.set(n, v);
     if (keyEl[n]) keyEl[n].classList.add("down");
-    if (node) { post({ t: "on", n, v }); if (ctx.state !== "running") ctx.resume().then(powerLabel); }
+    if (PLUGIN) post({ t: "on", n, v });
+    else if (node) { post({ t: "on", n, v }); if (ctx.state !== "running") ctx.resume().then(powerLabel); }
     else startAudio();
   }
   function noteOff(n) {
@@ -1227,6 +1260,7 @@
     const down = new Set(), downNote = {};
     window.addEventListener("keydown", (e) => {
       if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.code === "Space" && PLUGIN) return; /* (in a DAW, SPACE belongs to the DAW) */
       if (e.code === "Space") {                /* SPACE plays the sequencer, wherever the focus is */
         if (e.target && e.target.tagName === "SELECT") return;
         e.preventDefault();
@@ -1363,7 +1397,10 @@
     clearTimeout(saveT);
     saveT = setTimeout(remember, 500);
   }
-  function remember() { mem.set("selva1.last", JSON.stringify({ cur, dirty, patch: patchNow() })); }
+  function remember() {
+    if (PLUGIN) { bridge.send({ t: "name", n: cur.n }); return; }   /* (the DAW keeps the sound in its project) */
+    mem.set("selva1.last", JSON.stringify({ cur, dirty, patch: patchNow() }));
+  }
   function presetWire() {
     $("#pprev").addEventListener("click", () => choose(cur.i < 0 ? all().length - 1 : cur.i - 1));
     $("#pnext").addEventListener("click", () => choose(cur.i + 1));
@@ -1475,14 +1512,12 @@
         });
         lastStep = step;
       }
-      if (UI[1] !== lastPlaying) {
+      if (UI[1] !== lastPlaying && !PLUGIN) {
         lastPlaying = UI[1];
         SEQS.forEach((s) => s.play.setAttribute("aria-pressed", UI[1] ? "true" : "false"));
       }
-      const e = ENVS[envTab];
-      if (!e.d.hidden && Math.abs((e.lv || 0) - UI[8 + envTab]) > 0.004) drawEnv(e);
-      const l = LFOS[lfoTab];
-      if (l.ph !== UI[11 + lfoTab]) drawLfo(l);
+      ENVS.forEach((e, k) => { if (!e.d.hidden && Math.abs((e.lv || 0) - UI[8 + k]) > 0.004) drawEnv(e); });
+      LFOS.forEach((l, k) => { if (!l.d.hidden && l.ph !== UI[11 + k]) drawLfo(l); });
     }
     const src = liveSources();
     OSCS.forEach((o) => {
@@ -1508,6 +1543,7 @@
     INFO.dests.forEach((d, i) => { if (d.key && d.key !== "pitch") DKEY[d.key] = i; });
     ["a", "b", "c"].forEach((o) => { DKEY[`osc.${o}.semi`] = INFO.dests.findIndex((d) => d.name === `OSC ${o.toUpperCase()} PITCH`); });
     DKEY["global.tune"] = INFO.dests.findIndex((d) => d.name === "PITCH ALL");
+    if (PLUGIN) pluginLayout();
     sharedDefs();
     TEX = [];
     for (let t = 0; t < 8; t++) TEX.push(knobTexture(t * 7 + 3));
@@ -1530,9 +1566,10 @@
     $$(".drag[data-src]").forEach(dragSource);
     dragLabels();
     keyWire();
-    midiWire();
+    if (!PLUGIN) midiWire();
     pageWire();
     presetWire();
+    if (PLUGIN) { pluginWire(); modRings(); redrawAll(); requestAnimationFrame(loop); document.body.classList.add("ready"); return; }
     loadMem();
     let last = null;
     try { last = JSON.parse(mem.get("selva1.last") || "null"); } catch (e) { last = null; }
@@ -1548,6 +1585,70 @@
     requestAnimationFrame(loop);
     document.body.classList.add("ready");
   }
+  /* ------------------------------------------------------------------ the plugin --- */
+  /* the compact layout: the same modules, regrouped into tabs that fit a plugin window (1120 x 720) */
+  function pluginLayout() {
+    document.body.classList.add("plugin");
+    const tabsEl = $(".tabs");
+    const modBtn = document.createElement("button");
+    modBtn.setAttribute("role", "tab");
+    modBtn.setAttribute("aria-selected", "false");
+    modBtn.dataset.page = "mod";
+    modBtn.textContent = "MOD";
+    tabsEl.insertBefore(modBtn, tabsEl.children[1]);
+    const synth = $('section.page[data-page="synth"]');
+    const mod = document.createElement("section");
+    mod.className = "page";
+    mod.dataset.page = "mod";
+    mod.hidden = true;
+    mod.innerHTML = `<div class="grid"></div>`;
+    synth.after(mod);
+    $(".grid", mod).append($("#m-env"), $("#m-lfo"));
+    const seqPage = $('section.page[data-page="seq"]');
+    seqPage.append($("#m-arp"));
+    $("#plate").append($(".kscroll"));
+    $(".head").insertBefore($(".vstrip"), $(".head .right"));
+    const g = $('section.page[data-page="global"] .grid');
+    const sc = document.createElement("section");
+    sc.className = "mod c6";
+    sc.innerHTML = `<div class="mh"><h2>Janela</h2></div><div class="chips" id="scale">${[0.8, 1, 1.25, 1.5].map((v) => `<button class="seg1" type="button" data-v="${v}">${Math.round(v * 100)}%</button>`).join("")}</div>
+      <p class="hint" id="fmt"></p>`;
+    g.append(sc);
+    $("#midistate").textContent = "O MIDI vem da sua DAW: notas, mod wheel (CC1), sustain (CC64), cutoff (CC74), pitch bend e aftertouch.";
+    const ms = $("#midistate").nextElementSibling;
+    if (ms) ms.textContent = "O tempo e o PLAY vêm da DAW: com o SEQUENCER ligado (▶), ele toca junto com o projeto, no compasso. O BPM daqui vale quando não há DAW.";
+  }
+  function setScale(v) {
+    document.body.style.zoom = String(v);
+    $$("#scale .seg1").forEach((b) => b.setAttribute("aria-pressed", Math.abs(+b.dataset.v - v) < 0.01 ? "true" : "false"));
+  }
+  function pluginWire() {
+    $$("#scale .seg1").forEach((b) => b.addEventListener("click", () => { setScale(+b.dataset.v); bridge.send({ t: "scale", v: +b.dataset.v }); }));
+    bridge.listen((m) => {
+      if (!m || !m.t) return;
+      if (m.t === "ui") { UI = m.s; return; }
+      if (m.t === "vals") { for (let i = 0; i + 1 < m.a.length; i += 2) setRemote(m.a[i], m.a[i + 1]); later(modRings); return; }
+      if (m.t === "init") {
+        Object.keys(KV).forEach((k) => delete KV[k]);
+        Object.assign(KV, m.kv || {});
+        loadMem();
+        (m.vals || []).forEach((v, i) => setRemote(i, v));
+        wantPlay = !!m.armed;
+        SEQS.forEach((s) => s.play.setAttribute("aria-pressed", wantPlay ? "true" : "false"));
+        const name = String(m.name || "INIT"), L = all(), i = L.findIndex((pr) => pr.n === name);
+        cur = { i, n: name, b: i >= 0 ? L[i].b : "U" };
+        dirty = false;
+        showPreset();
+        if (m.scale) setScale(+m.scale);
+        if (m.format) $("#fmt").textContent = "Formato: " + m.format;
+        later(modRings);
+        SEQS.forEach(renderSeq);
+        redrawAll();
+      }
+    });
+    bridge.send({ t: "ready" });
+  }
+
   WebAssembly.instantiate(WASM, {}).then(({ instance }) => {
     X = instance.exports;
     X.s1_init(48000);

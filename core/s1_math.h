@@ -11,9 +11,19 @@
 static inline float s1_clamp(float x, float lo, float hi) { return x < lo ? lo : x > hi ? hi : x; }
 static inline float s1_min(float a, float b) { return a < b ? a : b; }
 static inline float s1_max(float a, float b) { return a > b ? a : b; }
+#if defined(_MSC_VER) && !defined(__clang__)       /* MSVC: no __builtin_, `inline` is spelled __inline in C */
+#include <math.h>
+#ifndef __cplusplus
+#define inline __inline
+#endif
+static inline float s1_abs(float x) { return fabsf(x); }
+static inline float s1_floor(float x) { return floorf(x); }
+static inline float s1_sqrt(float x) { return sqrtf(x); }
+#else
 static inline float s1_abs(float x) { return __builtin_fabsf(x); }
 static inline float s1_floor(float x) { return __builtin_floorf(x); }
 static inline float s1_sqrt(float x) { return __builtin_sqrtf(x); }
+#endif
 static inline float s1_lerp(float a, float b, float t) { return a + (b - a) * t; }
 
 typedef union { float f; uint32_t u; int32_t i; } s1_fu;

@@ -1,0 +1,31 @@
+SELVA1 · COMO INSTALAR NO MAC (Apple silicon e Intel)
+
+Nesta pasta:
+  Selva1.component   o plugin Audio Unit (Logic, GarageBand, Ableton Live)
+  Selva1.vst3        o plugin VST3 (Ableton Live, Bitwig, Reaper, Cubase, Studio One, FL Studio)
+  Selva1.app         o Selva1 sozinho, sem DAW
+
+1. Copie os plugins para as pastas do sistema
+   No Finder, menu Ir > Ir para a Pasta... (Shift + Cmd + G) e cole:
+     ~/Library/Audio/Plug-Ins/Components    -> arraste o Selva1.component para lá
+     ~/Library/Audio/Plug-Ins/VST3          -> arraste o Selva1.vst3 para lá
+
+2. Libere os plugins (eles ainda não têm a assinatura paga da Apple)
+   Abra o Terminal (Cmd + Espaço, digite Terminal) e cole esta linha inteira:
+     xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/Selva1.component ~/Library/Audio/Plug-Ins/VST3/Selva1.vst3
+   Para o app: arraste o Selva1.app para Aplicativos e rode também:
+     xattr -dr com.apple.quarantine /Applications/Selva1.app
+
+3. Abra na DAW
+   Ableton Live: Settings > Plug-Ins > ligue "Use Audio Units" e "Use VST3 Plug-In System Folders" > Rescan.
+                 O Selva1 aparece em Plug-Ins > DeAbrew.
+   Logic:        ele é verificado na primeira abertura; aparece em Instrumentos > AU Instruments > DeAbrew > Selva1.
+                 Se não aparecer: Logic Pro > Settings > Plug-in Manager > Reset & Rescan Selection.
+
+O SEQUENCER no plugin: aperte o PLAY (▶) do Selva1 para ligar; ele toca junto com o PLAY da DAW, no tempo
+e no compasso do projeto. As notas MIDI da DAW transpõem a sequência.
+
+Seu projeto guarda o som inteiro (parâmetros e passos). Os sons que você salva em SAVE AS ficam em
+~/Library/Application Support/DeAbrew/Selva1/panel.json, iguais em todas as DAWs.
+
+Selva1 é software livre (GPL-3.0). Copyright (C) 2026 DeAbrew.

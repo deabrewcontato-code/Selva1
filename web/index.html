@@ -289,6 +289,84 @@ select.sel option { background: #161514; color: var(--cream); }
   .plate { padding: 12px 10px 14px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* ===== the plugin's window: 1120 x 720, every module regrouped into tabs (SYNTH, MOD, FX, MATRIX, SEQUENCER, GLOBAL) ===== */
+.ph { display: none; }
+body.plugin { padding: 0; width: 1120px; height: 720px; overflow: hidden; background: var(--plate); }
+body.plugin .plate { max-width: none; width: 1120px; height: 720px; border: 0; padding: 6px 10px 6px; gap: 6px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto; align-content: stretch; }
+body.plugin .screw { width: 8px; height: 8px; }
+body.plugin .screw.tl, body.plugin .screw.bl { left: 3px; } body.plugin .screw.tr, body.plugin .screw.br { right: 3px; }
+body.plugin .screw.tl, body.plugin .screw.tr { top: 3px; } body.plugin .screw.bl, body.plugin .screw.br { bottom: 3px; }
+body.plugin .foot, body.plugin .kbar, body.plugin #power, body.plugin .ver { display: none; }
+body.plugin .head { grid-template-columns: auto minmax(0, 1fr) auto; padding: 0 4px 6px; gap: 14px; }
+body.plugin .word { font-size: 38px; }
+body.plugin .tag { display: block; font-size: 8px; padding-left: 10px; line-height: 1.45; }
+body.plugin .pbar { grid-column: auto; grid-row: auto; justify-self: center; width: min(470px, 100%); }
+body.plugin .pbox { height: 32px; grid-template-columns: 32px minmax(0, 1fr) 30px 32px; }
+body.plugin .pname .nm { font-size: 14px; } body.plugin .pname .num { font-size: 12px; }
+body.plugin .pmeta, body.plugin .pmeta button { font-size: 9px; }
+body.plugin .dab { font-size: 12px; letter-spacing: .28em; }
+body.plugin .bar { gap: 6px; }
+body.plugin .tabs button { padding: 7px 16px; font-size: 11px; }
+body.plugin .vstrip { padding: 0 10px; gap: 10px; }
+body.plugin section.page[data-page] { min-height: 0; overflow: hidden; align-content: start; }
+body.plugin .grid { gap: 6px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+body.plugin .mod { padding: 5px 8px 7px; gap: 5px; }
+body.plugin .mh { min-height: 22px; gap: 8px; }
+body.plugin .mh h2 { font-size: 17px; } body.plugin .mh .no { font-size: 22px; padding-right: 8px; }
+body.plugin .lbl, body.plugin .knob .kl { font-size: 9px; } body.plugin .knob .kv { font-size: 9px; min-height: 11px; }
+body.plugin .stepper .box { width: 30px; height: 22px; font-size: 11px; }
+body.plugin .mtabs button, body.plugin .seg button { padding: 3px 6px; font-size: 9px; }
+body.plugin select.sel { padding: 3px 20px 3px 6px; font-size: 10px; background-position: right 6px center; }
+body.plugin .led { width: 22px; height: 16px; }
+body.plugin .screen .cap { font-size: 11px; bottom: 5px; } body.plugin .screen .tr { top: 5px; }
+body.plugin .oscgrid { gap: 2px 2px; grid-template-columns: minmax(60px, 1.2fr) repeat(4, minmax(0, 1fr)); }
+body.plugin .oscrow { gap: 2px 2px; }
+body.plugin .ctl { gap: 4px 6px; }
+body.plugin .seg1 { padding: 3px 6px; font-size: 9px; }
+body.plugin .chips { gap: 3px; }
+/* SYNTH: the three oscillators over the filter, sub, noise, amp and macros */
+body.plugin .grid > .osc { grid-column: span 4; }
+body.plugin .grid > #m-flt { grid-column: span 4; }
+body.plugin .grid > [data-power="sub.on"], body.plugin .grid > [data-power="noise.on"], body.plugin .grid > #m-amp { grid-column: span 2; }
+body.plugin .grid > #m-mac { grid-column: span 2; }
+body.plugin .grid > #m-seq, body.plugin .grid > #m-mx, body.plugin .grid > #m-fx { display: none; }
+body.plugin #m-mac .mh .hint { display: none; }
+body.plugin #macros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; }
+body.plugin #macros .drag span { display: none; }
+body.plugin .meter2 { height: 46px; }
+/* MOD: the three envelopes and the three LFOs side by side */
+body.plugin [data-page="mod"] .grid > .mod { grid-column: span 12; }
+body.plugin #m-env .envbox, body.plugin #m-lfo .lfobox { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+body.plugin #m-env > .mh .mtabs, body.plugin #m-lfo > .mh .mtabs, body.plugin #m-env > .mh .drag, body.plugin #m-lfo > .mh .drag { display: none; }
+body.plugin .ph { display: flex; justify-content: space-between; align-items: center; }
+body.plugin .ph .lbl { color: var(--cream-3); letter-spacing: .14em; }
+/* FX, MATRIX, SEQUENCER, GLOBAL */
+body.plugin .fxrack { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+body.plugin #mxfull .mxr { gap: 6px; } body.plugin #mxfull .mxr select.sel { font-size: 10px; padding: 3px 20px 3px 6px; }
+body.plugin #mxfull .amt { height: 18px; } body.plugin .mx { gap: 3px; }
+body.plugin [data-page="seq"] { gap: 6px; }
+body.plugin .seqbig .steps { height: 168px; }
+body.plugin .seqbig .tc { height: 22px; }
+body.plugin [data-page="global"] .grid > .mod { grid-column: span 6; }
+body.plugin #scale { margin-top: 2px; }
+/* a slim keyboard to try sounds */
+body.plugin .kscroll { padding: 3px 4px 4px; overflow: hidden; }
+body.plugin .keys { height: 44px; min-width: 0; }
+body.plugin .wk, body.plugin .bk { font-size: 8px; padding-bottom: 2px; }
+
+body.plugin .head { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+body.plugin .head .vstrip { border: 0; padding: 0; gap: 8px; }
+body.plugin .head .vstrip .lbl { font-size: 9px; }
+body.plugin .knob .kv { display: none; }
+body.plugin .knob:hover .kl, body.plugin .knob.drag .kl, body.plugin .knob:focus-visible .kl { display: none; }
+body.plugin .knob:hover .kv, body.plugin .knob.drag .kv, body.plugin .knob:focus-visible .kv { display: block; color: var(--cream); font-size: 9px; }
+body.plugin .bar { display: block; }
+body.plugin .tabs { display: inline-flex; }
+body.plugin [data-page="seq"] { display: grid; grid-template-columns: minmax(0, 1fr); }
+body.plugin [data-page="seq"][hidden] { display: none; }
+body.plugin #m-arp { max-width: 420px; }
+
 </style>
 
 <div class="plate" id="plate">

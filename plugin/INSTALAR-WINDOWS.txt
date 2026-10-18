@@ -1,0 +1,16 @@
+SELVA1 · COMO INSTALAR NO WINDOWS
+
+Nesta pasta:
+  Selva1.vst3   o plugin VST3 (Ableton Live, FL Studio, Bitwig, Reaper, Cubase, Studio One)
+  Selva1.exe    o Selva1 sozinho, sem DAW
+
+1. Copie a pasta Selva1.vst3 inteira para:
+     C:\Program Files\Common Files\VST3
+2. Na DAW, peça uma nova busca de plugins (Ableton: Options > Preferences > Plug-Ins > Rescan).
+3. O Selva1 usa o WebView2 da Microsoft para o painel; ele já vem no Windows 10 e 11 atualizados.
+   Se o painel abrir em branco, instale o "WebView2 Runtime" no site da Microsoft.
+
+Na primeira abertura, o Windows pode avisar que o app é de um editor desconhecido: clique em
+"Mais informações" > "Executar assim mesmo".
+
+Selva1 é software livre (GPL-3.0). Copyright (C) 2026 DeAbrew.

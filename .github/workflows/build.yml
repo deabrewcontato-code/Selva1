@@ -1,0 +1,172 @@
+# Selva1 · builds everything on GitHub: the engine's tests, the web pages, the plugin for macOS (AU, VST3,
+# universal: Apple silicon and Intel), Windows (VST3) and Linux (VST3, checked with pluginval), and the
+# firmware for the M-VAVE FM-1 (.fwsc and its installer page). A tag v* makes a release with all of it.
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  panel:
+    name: Engine tests and web pages
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang lld
+      - name: Engine tests
+        run: |
+          mkdir -p build
+          cc -O2 -Wall -DS1_HOST -Icore -o build/s1_test tests/s1_test.c -lm
+          ./build/s1_test build
+      - name: WebAssembly and pages
+        run: |
+          sh tools/build_wasm.sh
+          python3 tools/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panel
+          path: dist/
+
+  mac:
+    name: Plugin for macOS (AU, VST3)
+    needs: panel
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: panel
+          path: dist
+      - name: Configure (universal)
+        run: cmake -B build -S plugin -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+      - name: Build
+        run: cmake --build build --config Release --target Selva1_AU Selva1_VST3 Selva1_Standalone -- -quiet
+      - name: Sign (ad hoc) and pack
+        run: |
+          A=build/Selva1_artefacts/Release
+          mkdir -p Selva1-mac
+          cp -R "$A/AU/Selva1.component" "$A/VST3/Selva1.vst3" "$A/Standalone/Selva1.app" Selva1-mac/
+          for b in Selva1-mac/Selva1.component Selva1-mac/Selva1.vst3 Selva1-mac/Selva1.app; do codesign --force --deep --sign - "$b"; done
+          cp plugin/INSTALAR-MAC.txt Selva1-mac/
+          ditto -c -k --sequesterRsrc --keepParent Selva1-mac Selva1-mac.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Selva1-mac
+          path: Selva1-mac.zip
+
+  windows:
+    name: Plugin for Windows (VST3)
+    needs: panel
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: panel
+          path: dist
+      - name: WebView2 SDK
+        shell: pwsh
+        run: |
+          Register-PackageSource -ProviderName NuGet -Name nugetRepository -Location https://www.nuget.org/api/v2 -Force
+          Install-Package Microsoft.Web.WebView2 -Scope CurrentUser -RequiredVersion 1.0.1901.177 -Source nugetRepository -Force
+      - name: Configure
+        run: cmake -B build -S plugin -G "Visual Studio 17 2022" -A x64
+      - name: Build
+        run: cmake --build build --config Release --target Selva1_VST3 Selva1_Standalone
+      - name: Pack
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Selva1-windows | Out-Null
+          Copy-Item -Recurse build/Selva1_artefacts/Release/VST3/Selva1.vst3 Selva1-windows/
+          Copy-Item build/Selva1_artefacts/Release/Standalone/Selva1.exe Selva1-windows/
+          Copy-Item plugin/INSTALAR-WINDOWS.txt Selva1-windows/
+          Compress-Archive -Path Selva1-windows -DestinationPath Selva1-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Selva1-windows
+          path: Selva1-windows.zip
+
+  linux:
+    name: Plugin for Linux (VST3, pluginval)
+    needs: panel
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: panel
+          path: dist
+      - name: Libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build libasound2-dev libjack-jackd2-dev libcurl4-openssl-dev libfreetype-dev \
+            libfontconfig1-dev libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev \
+            libxrender-dev libwebkit2gtk-4.1-dev libgtk-3-dev libglu1-mesa-dev xvfb
+      - name: Build
+        run: |
+          cmake -B build -S plugin -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target Selva1_VST3
+      - name: pluginval (strictness 5, no window)
+        run: |
+          curl -sSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Linux.zip
+          unzip -q pluginval.zip
+          xvfb-run -a ./pluginval --strictness-level 5 --validate-in-process --skip-gui-tests build/Selva1_artefacts/Release/VST3/Selva1.vst3
+
+  fm1:
+    name: Firmware for the M-VAVE FM-1
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-pil xz-utils
+      - name: JieLi toolchain (clang for pi32v2)
+        run: sh firmware/tools/get_toolchain.sh "$HOME/.jieli"
+      - name: JieLi AC79 SDK (the package uses three of its files)
+        run: |
+          SDK="$HOME/fw-AC79_AIoT_SDK"
+          TAG=AC79NN_SDK_V1.2.1_2023-12-13
+          URL=https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK.git
+          ( git clone -q --depth 1 --filter=blob:none --sparse --branch $TAG $URL "$SDK" && git -C "$SDK" sparse-checkout set cpu/wl82/tools ) \
+            || ( rm -rf "$SDK" && git clone -q --depth 1 --branch $TAG $URL "$SDK" )
+          ls -la "$SDK/cpu/wl82/tools/uboot.boot" "$SDK/cpu/wl82/tools/cfg_tool.bin" "$SDK/cpu/wl82/tools/cfg/eq_cfg_hw.bin"
+      - name: Build the firmware
+        run: cd firmware && ./build.sh --release 0.1-selva1
+      - name: Installer page
+        run: |
+          cd firmware
+          PKG=$(ls build/*.fwsc | head -1)
+          python3 web/make_site.py "$PKG" 0.1-selva1 ../fm1-site
+          cp "$PKG" ../selva1-fm1-0.1.fwsc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Selva1-FM1
+          path: |
+            selva1-fm1-0.1.fwsc
+            fm1-site/
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [mac, windows, linux, fm1]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Pack the FM-1 files
+        run: |
+          cd art/Selva1-FM1 && zip -qr ../../Selva1-FM1-instalador.zip fm1-site && cp selva1-fm1-0.1.fwsc ../../
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            art/Selva1-mac/Selva1-mac.zip
+            art/Selva1-windows/Selva1-windows.zip
+            selva1-fm1-0.1.fwsc
+            Selva1-FM1-instalador.zip

@@ -34,7 +34,11 @@ void *memcpy(void *d, const void *s, unsigned long n)
 
 #include "s1_wt.c"
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#define S1_EXPORT
+#else
 #define S1_EXPORT __attribute__((visibility("default")))
+#endif
 S1_EXPORT void s1_note_off(int note);
 #define BLK 32                              /* the control block */
 #define MAXV 16                             /* voices */
@@ -139,6 +143,7 @@ typedef struct s1_ctx {
     int arp_chord[8], narp_chord;
     float out_l[BLK], out_r[BLK];
     int render_pos;                         /* s1_render: where in the control block */
+    float host_bpm;                         /* > 0: a host's tempo, in place of BPM */
 } s1_ctx;
 #if defined(S1_THREADS) && !defined(__wasm__)
 #ifdef _MSC_VER
@@ -254,7 +259,11 @@ static float env_run(env_t *e, int k, float n)
     return e->v;
 }
 
-static float bpm(void) { s1_ctx *const S = s1_cur; return s1_clamp(S->pv[P_BPM], 20, 300); }
+static float bpm(void)                      /* the host's tempo when it gives one (a plugin), else BPM */
+{
+    s1_ctx *const S = s1_cur;
+    return s1_clamp(S->host_bpm > 0 ? S->host_bpm : S->pv[P_BPM], 20, 300);
+}
 /* the LFO's rate (Hz): free, or synced to the tempo; rmod the RATE modulation (normalised offset) */
 static float lfo_hz(int k, float rmod)
 {
@@ -1485,6 +1494,37 @@ S1_EXPORT void s1_transport(int play)
         { int k; for (k = 0; k < 4; k++) S->seqmod[k] = 0; }
     }
 }
+/* a host's tempo (a plugin in a DAW): > 0 replaces BPM, 0 gives it back */
+S1_EXPORT void s1_host_tempo(float b) { s1_ctx *const S = s1_cur; S->host_bpm = b > 0 ? s1_clamp(b, 20, 300) : 0; }
+/* starts the sequencer at a position of the host's song, in beats: the steps land on the host's grid */
+S1_EXPORT void s1_transport_from(double beats)
+{
+    s1_ctx *const S = s1_cur;
+    double sb = (double)SEQRATE_BEATS[PI_(P_SEQ_RATE) % 6], base = sb * 60.0 / (double)bpm() * (double)S->sr, q, fr;
+    int len = PI_(P_SEQ_LEN), n;
+    if (len < 1)
+        len = 1;
+    s1_transport(0);
+    s1_transport(1);
+    if (beats < 0)
+        beats = 0;
+    q = beats / sb;
+    n = (int)q;
+    fr = q - (double)n;
+    if (fr < 1e-3) {                         /* on a step: it plays now */
+        S->seq_step = n == 0 ? -1 : (n - 1) % len;
+        S->seq_clock = base;
+        S->seq_step_len = base;
+        if (S->seq_step < 0) {
+            S->seq_clock = 0;
+            S->seq_step_len = 0;
+        }
+    } else {                                 /* inside a step: the next one on time */
+        S->seq_step = n % len;
+        S->seq_step_len = base;
+        S->seq_clock = fr * base;
+    }
+}
 
 /* renders n samples (any n) into l, r */
 S1_EXPORT void s1_render(float *l, float *r, int n)
@@ -1691,6 +1731,13 @@ S1_EXPORT const char *s1_info(void)
     putn((float)S1_LANES);
     put(",\"seqBase\":");
     putn((float)S1_NPARAM);
+    put(",\"laneDefaults\":[");
+    for (i = 0; i < S1_LANES; i++) {
+        if (i)
+            put(",");
+        putn(LANE_DEF[i]);
+    }
+    put("]");
     put("}");
     info[ip] = 0;
     return info;

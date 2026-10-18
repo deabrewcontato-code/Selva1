@@ -43,4 +43,25 @@ with open(os.path.join(ROOT, "dist/selva1/selva1-worklet.js"), "w", encoding="ut
     f.write(worklet)
 with open(os.path.join(ROOT, "dist/selva1-worklet.js"), "w", encoding="utf-8") as f:
     f.write(worklet)
+
+# the plugin's page: offline (fonts inlined, no Google Fonts), marked as the plugin's
+FONTS = [("Anton", 400, "anton-latin-400-normal.woff2"), ("DM Mono", 400, "dm-mono-latin-400-normal.woff2"),
+         ("DM Mono", 500, "dm-mono-latin-500-normal.woff2"), ("Inter", 400, "inter-latin-400-normal.woff2"),
+         ("Inter", 600, "inter-latin-600-normal.woff2")]
+faces = "".join("@font-face{font-family:'%s';font-weight:%d;font-style:normal;src:url(data:font/woff2;base64,%s) format('woff2')}\n"
+                % (fam, w, base64.b64encode(open(os.path.join(ROOT, "web/fonts", fn), "rb").read()).decode())
+                for fam, w, fn in FONTS)
+plug = page
+for ln in [l for l in plug.split("\n") if "fonts.googleapis.com" in l or "fonts.gstatic.com" in l]:
+    plug = plug.replace(ln + "\n", "")
+plug = plug.replace("<style>", "<style>\n" + faces, 1)
+cut = plug.index('<div class="plate"')
+phead, pbody = plug[:cut], plug[cut:]
+pfull = ('<!doctype html>\n<html lang="pt-BR">\n<head>\n<meta charset="utf-8">\n'
+         '<meta name="viewport" content="width=1120, initial-scale=1">\n'
+         '<script>window.SELVA1_HOST = "plugin";</script>\n' + phead + '</head>\n<body class="plugin">\n' + pbody + '\n</body>\n</html>\n')
+os.makedirs(os.path.join(ROOT, "dist/plugin"), exist_ok=True)
+with open(os.path.join(ROOT, "dist/plugin/index.html"), "w", encoding="utf-8") as f:
+    f.write(pfull)
+print("dist/plugin/index.html %d bytes" % len(pfull.encode()))
 print("dist/artifact.html %d bytes, dist/selva1/index.html %d bytes, wasm %d bytes" % (len(page.encode()), len(full.encode()), len(wasm)))

@@ -1,0 +1,909 @@
+<title>Selva1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Selva1: synth analógico inspirado na selva de pedra de São Paulo. O mesmo motor do firmware do FM-1, tocando no navegador.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one instrument panel between wooden end cheeks, modules in the signal's order (sources, mixer, filter,
+   envelopes, modulation, output), the keyboard under it; at phone width the modules stack and the keys scroll. */
+:root {
+  color-scheme: dark;
+  --bg: #131110;          /* the room */
+  --panel: #1C1A18;       /* the faceplate */
+  --inset: #151311;       /* screens, graphs, recessed wells */
+  --line: #34302B;        /* silkscreen rules */
+  --cream: #EFE6DF;       /* silkscreen legends */
+  --muted: #9C9188;       /* secondary legends */
+  --red: #C33A2E;         /* DeAbrew red: active switches, the power LED */
+  --yellow: #FFC700;      /* readouts, the cutoff's cap, the scope trace */
+  --wood-a: #6E4527;
+  --wood-b: #3B2416;
+  --display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --knob: 58px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); color: var(--cream); }
+body {
+  font-family: var(--display);
+  font-stretch: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: var(--s5) var(--s6);
+}
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.wrap { max-width: 1360px; margin: 0 auto; display: grid; gap: var(--s4); }
+
+/* top bar */
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--s4); }
+.brand { display: grid; gap: var(--s1); min-width: 0; }
+.brand h1 {
+  margin: 0; font-size: clamp(40px, 7vw, 64px); line-height: .9; font-weight: 800; font-stretch: 125%;
+  letter-spacing: -.01em; text-wrap: balance;
+}
+.brand h1 span { color: var(--red); }
+.brand p { margin: 0; color: var(--muted); font-size: 15px; max-width: 60ch; }
+.controls-top { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.btn {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 9px 14px; cursor: pointer;
+  font-stretch: 85%; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: 12px;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.power { display: inline-flex; align-items: center; gap: var(--s2); }
+.led { width: 9px; height: 9px; border-radius: 50%; background: #3a1512; box-shadow: inset 0 0 0 1px #000; }
+.on .led { background: var(--red); box-shadow: 0 0 10px var(--red); }
+.btn.on { border-color: var(--red); }
+.presets { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.presets select {
+  background: var(--inset); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; min-width: 0;
+  font-family: var(--mono); font-size: 13px; color: var(--yellow); max-width: 220px;
+}
+.saveform { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.saveform input {
+  background: var(--inset); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 160px;
+  font-family: var(--mono); font-size: 13px;
+}
+.msg { font-family: var(--mono); font-size: 12px; color: var(--muted); min-height: 1.4em; }
+
+/* the instrument */
+.instrument { display: grid; grid-template-columns: 22px minmax(0, 1fr) 22px; border-radius: 10px; overflow: hidden;
+  box-shadow: 0 18px 40px -20px #000; }
+.cheek { background: linear-gradient(90deg, var(--wood-b), var(--wood-a) 45%, var(--wood-b)); }
+.cheek::after { content: ""; display: block; height: 100%;
+  background: repeating-linear-gradient(180deg, transparent 0 7px, rgba(0,0,0,.12) 7px 8px, transparent 8px 19px); }
+.face { background: var(--panel); padding: var(--s4); display: grid; gap: var(--s3);
+  grid-template-columns: repeat(12, minmax(0, 1fr)); border-top: 3px solid #0d0c0b; border-bottom: 3px solid #0d0c0b; }
+.mod { border: 1px solid var(--line); border-radius: 8px; padding: var(--s3); display: grid; gap: var(--s3);
+  align-content: start; min-width: 0; }
+.mod > header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s2); flex-wrap: wrap; }
+.mod h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-stretch: 112%; }
+.chip { font-family: var(--mono); font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px;
+  padding: 2px 8px; white-space: nowrap; }
+.chip.live { color: var(--cream); border-color: #5b2a24; }
+.m-osc { grid-column: span 5; } .m-mix { grid-column: span 3; } .m-flt { grid-column: span 4; }
+.m-fenv { grid-column: span 4; } .m-aenv { grid-column: span 4; } .m-lfo { grid-column: span 4; }
+.m-voice { grid-column: span 4; } .m-out { grid-column: span 8; }
+
+.row { display: flex; flex-wrap: wrap; gap: var(--s3) var(--s4); align-items: flex-end; }
+.group { display: grid; gap: var(--s2); min-width: 0; }
+.glabel { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; font-stretch: 90%; }
+.osc-line { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--s2) var(--s3); align-items: center;
+  padding-bottom: var(--s3); border-bottom: 1px dashed var(--line); }
+.osc-line:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.osc-name { font-weight: 800; font-size: 15px; font-stretch: 120%; letter-spacing: .02em; }
+.mixgrid { display: grid; grid-template-columns: repeat(2, max-content); gap: var(--s3) var(--s4); justify-content: start; }
+.note { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 32ch; flex: 1 1 140px; }
+.osc-ctl { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: flex-end; min-width: 0; }
+
+/* switches */
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--inset); }
+.seg button { border: 0; background: transparent; padding: 6px 8px; cursor: pointer; font-family: var(--mono); font-size: 11.5px;
+  color: var(--muted); min-width: 34px; display: inline-flex; align-items: center; justify-content: center; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--red); color: #fff; }
+.seg button:hover:not([aria-pressed="true"]) { color: var(--cream); }
+.seg svg { width: 26px; height: 15px; display: block; }
+.seg svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+
+/* knobs */
+.knob { display: grid; justify-items: center; gap: 3px; width: calc(var(--knob) + 18px); cursor: ns-resize; user-select: none;
+  touch-action: none; border-radius: 6px; }
+.knob.big { --knob: 84px; }
+.knob.small { --knob: 46px; }
+.knob svg { width: var(--knob); height: var(--knob); display: block; overflow: visible; }
+.knob .tick { stroke: var(--muted); stroke-width: 2; }
+.knob .tick.major { stroke: var(--cream); stroke-width: 2.4; }
+.knob .skirt { fill: #0c0b0a; stroke: #2a2723; stroke-width: 1.5; }
+.knob .cap { fill: url(#alu); stroke: #6d6a66; stroke-width: .8; }
+.knob.big .cap { fill: url(#alu-y); }
+.knob .ptr { stroke: #111; stroke-width: 3.2; stroke-linecap: round; }
+.knob .arc { fill: none; stroke: var(--red); stroke-width: 3; stroke-linecap: round; }
+.knob.big .arc { stroke: var(--yellow); }
+.knob .lab { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; font-stretch: 88%; text-align: center; line-height: 1.15; }
+.knob .val { font-family: var(--mono); font-size: 11px; color: var(--yellow); font-variant-numeric: tabular-nums; min-height: 1.3em; white-space: nowrap; }
+.knob.dim { opacity: .45; }
+
+/* envelope graphs */
+.envbox { display: grid; gap: var(--s2); }
+.env { width: 100%; height: auto; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; touch-action: none; }
+.env .grid { stroke: #24211e; stroke-width: 1; }
+.env .area { fill: rgba(195, 58, 46, .18); }
+.env .curve { fill: none; stroke: var(--red); stroke-width: 2.4; stroke-linejoin: round; }
+.env .h { fill: var(--panel); stroke: var(--yellow); stroke-width: 2.2; cursor: grab; }
+.env .h:hover, .env .h.drag { fill: var(--yellow); }
+.env .hit { fill: transparent; cursor: grab; }
+.env text { fill: var(--muted); font-family: var(--mono); font-size: 9px; }
+.envknobs { display: flex; justify-content: space-between; gap: var(--s2); flex-wrap: wrap; }
+
+.resp { width: 100%; height: auto; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; }
+.resp .grid { stroke: #24211e; stroke-width: 1; }
+.resp .zero { stroke: #3a3530; stroke-width: 1; }
+.resp .curve { fill: none; stroke: var(--yellow); stroke-width: 2.2; stroke-linejoin: round; }
+.resp .area { fill: rgba(255, 199, 0, .08); }
+.resp .fc { stroke: var(--red); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.resp text { fill: var(--muted); font-family: var(--mono); font-size: 9px; }
+
+/* scope */
+.outrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: var(--s4); align-items: center; }
+.screen { position: relative; background: #050505; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.screen canvas { display: block; width: 100%; height: 110px; }
+.screen .meter { position: absolute; left: 8px; bottom: 6px; right: 8px; height: 3px; background: #1d1b19; border-radius: 2px; }
+.screen .meter i { display: block; height: 100%; width: 0; background: var(--yellow); border-radius: 2px; transition: width .08s linear; }
+.screen .state { position: absolute; top: 6px; left: 8px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+
+/* keyboard */
+.kbbar { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); align-items: center; justify-content: space-between; }
+.kbbar .left { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.oct { font-family: var(--mono); color: var(--yellow); min-width: 3.2em; text-align: center; font-size: 13px; }
+.hint { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.keyscroll { overflow-x: auto; border-radius: 8px; background: #0b0a09; padding: 10px 10px 12px; }
+.keys { position: relative; height: 150px; display: flex; min-width: 600px; touch-action: none; user-select: none; }
+.wk { flex: 1 1 0; position: relative; background: linear-gradient(#f3ece5, #e2d8cf); border: 1px solid #8f857c; border-top: 0;
+  border-radius: 0 0 5px 5px; margin-right: 2px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; }
+.wk:last-child { margin-right: 0; }
+.wk span, .bk span { font-family: var(--mono); font-size: 10px; color: #8a7f75; pointer-events: none; }
+.bk { position: absolute; top: 0; height: 60%; background: linear-gradient(#2a2725, #0e0d0c); border-radius: 0 0 4px 4px; z-index: 2;
+  border: 1px solid #000; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px; }
+.bk span { color: #8f857c; }
+.wk.down { background: linear-gradient(#ffd64d, var(--yellow)); }
+.bk.down { background: linear-gradient(#e0473a, var(--red)); }
+
+footer { color: var(--muted); font-size: 13px; display: grid; gap: var(--s1); max-width: 75ch; }
+footer p { margin: 0; }
+footer code { font-family: var(--mono); font-size: 12px; color: var(--cream); }
+
+@media (max-width: 1180px) {
+  .m-osc { grid-column: span 7; } .m-mix { grid-column: span 5; } .m-flt { grid-column: span 6; } .m-fenv { grid-column: span 6; }
+  .m-aenv { grid-column: span 6; } .m-lfo { grid-column: span 6; } .m-voice { grid-column: span 5; } .m-out { grid-column: span 7; }
+}
+@media (max-width: 860px) {
+  .face { grid-template-columns: minmax(0, 1fr); }
+  .face > .mod { grid-column: 1 / -1; }
+  .outrow { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  :root { --knob: 50px; }
+  .instrument { grid-template-columns: 10px minmax(0, 1fr) 10px; }
+  .face { padding: var(--s3); }
+  .osc-line { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .screen .meter i { transition: none; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="alu" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#f4f2ee"/><stop offset=".55" stop-color="#b9b5ae"/><stop offset="1" stop-color="#7b7771"/></radialGradient>
+    <radialGradient id="alu-y" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#fff2bd"/><stop offset=".55" stop-color="#e9b800"/><stop offset="1" stop-color="#8c6d00"/></radialGradient>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <h1>Selva<span>1</span></h1>
+      <p>Synth analógico inspirado na selva de pedra de São Paulo. Este painel roda o mesmo motor em C do firmware do FM-1, então o som daqui é o som que vai sair do aparelho.</p>
+    </div>
+    <div class="controls-top">
+      <button class="btn power" id="power" type="button"><span class="led"></span><span id="power-label">Ligar o som</span></button>
+      <div class="presets">
+        <button class="btn" id="prev" type="button" aria-label="Som anterior">&#8249;</button>
+        <select id="preset" aria-label="Sons"></select>
+        <button class="btn" id="next" type="button" aria-label="Próximo som">&#8250;</button>
+        <button class="btn" id="save" type="button">Salvar</button>
+        <button class="btn" id="copy" type="button">Copiar patch</button>
+        <button class="btn" id="del" type="button" hidden>Apagar</button>
+      </div>
+    </div>
+  </div>
+  <form class="saveform" id="saveform" hidden>
+    <label class="glabel" for="savename">Nome do som</label>
+    <input id="savename" maxlength="24" autocomplete="off" placeholder="MEU BASS">
+    <button class="btn" type="submit" id="savego">Guardar no navegador</button>
+    <button class="btn" type="button" id="savecancel">Cancelar</button>
+  </form>
+  <div class="msg" id="msg" role="status" aria-live="polite"></div>
+
+  <div class="instrument">
+    <div class="cheek" aria-hidden="true"></div>
+    <div class="face" id="face">
+      <section class="mod m-osc" aria-labelledby="h-osc">
+        <header><h2 id="h-osc">Osciladores</h2><span class="chip">FM-1: pelos presets, páginas na etapa 2</span></header>
+        <div class="osc-line">
+          <div class="osc-name">OSC 1</div>
+          <div class="osc-ctl">
+            <div class="group"><span class="glabel">Onda</span><div class="seg" data-kind="x" data-id="0" data-type="wave"></div></div>
+            <div class="group"><span class="glabel">Faixa</span><div class="seg" data-kind="x" data-id="1" data-type="range"></div></div>
+          </div>
+        </div>
+        <div class="osc-line">
+          <div class="osc-name">OSC 2</div>
+          <div class="osc-ctl">
+            <div class="group"><span class="glabel">Onda</span><div class="seg" data-kind="x" data-id="3" data-type="wave"></div></div>
+            <div class="group"><span class="glabel">Faixa</span><div class="seg" data-kind="x" data-id="4" data-type="range"></div></div>
+            <div class="knob small" data-kind="x" data-id="5" data-fmt="semi" data-label="Semitom"></div>
+            <div class="knob small" data-kind="x" data-id="6" data-fmt="cents" data-label="Fino"></div>
+          </div>
+        </div>
+        <div class="osc-line">
+          <div class="osc-name">SUB</div>
+          <div class="osc-ctl">
+            <div class="group"><span class="glabel">Tipo, abaixo do OSC 1</span><div class="seg" data-kind="x" data-id="8" data-type="sub"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mod m-mix" aria-labelledby="h-mix">
+        <header><h2 id="h-mix">Mixer</h2><span class="chip">FM-1: pelos presets</span></header>
+        <div class="mixgrid">
+          <div class="knob" data-kind="x" data-id="2" data-fmt="pct" data-label="OSC 1"></div>
+          <div class="knob" data-kind="x" data-id="7" data-fmt="pct" data-label="OSC 2"></div>
+          <div class="knob" data-kind="x" data-id="9" data-fmt="pct" data-label="Sub"></div>
+          <div class="knob" data-kind="x" data-id="11" data-fmt="pct" data-label="Ruído"></div>
+        </div>
+        <div class="group"><span class="glabel">Cor do ruído</span><div class="seg" data-kind="x" data-id="10" data-type="noise"></div></div>
+        <div class="row">
+          <div class="knob small" data-kind="x" data-id="13" data-fmt="pct" data-label="Drift"></div>
+          <p class="note">Drift desafina cada nota um pouco, os dois osciladores para lados diferentes, como num synth antigo.</p>
+        </div>
+      </section>
+
+      <section class="mod m-flt" aria-labelledby="h-flt">
+        <header><h2 id="h-flt">Filtro 24 dB</h2><span class="chip live">FM-1: EDIT FLT</span></header>
+        <div class="row">
+          <div class="knob big" data-kind="p" data-id="E0" data-fmt="hz" data-label="Corte"></div>
+          <div class="knob" data-kind="p" data-id="E1" data-fmt="pct" data-label="Ênfase"></div>
+          <div class="knob" data-kind="p" data-id="E2" data-fmt="bi" data-label="Envelope"></div>
+          <div class="knob" data-kind="p" data-id="E3" data-fmt="pct" data-label="Drive"></div>
+        </div>
+        <div class="group"><span class="glabel">Teclado controla o corte</span><div class="seg" data-kind="x" data-id="12" data-type="ktr"></div></div>
+        <div class="group">
+          <span class="glabel">Resposta, sem o envelope</span>
+          <svg class="resp" id="resp" viewBox="0 0 320 120" role="img" aria-label="Curva de resposta do filtro"></svg>
+        </div>
+      </section>
+
+      <section class="mod m-fenv" aria-labelledby="h-fenv">
+        <header><h2 id="h-fenv">Envelope do filtro</h2><span class="chip live">FM-1: EDIT FEG</span></header>
+        <div class="envbox" data-env="fenv"></div>
+      </section>
+
+      <section class="mod m-aenv" aria-labelledby="h-aenv">
+        <header><h2 id="h-aenv">Envelope do volume</h2><span class="chip live">FM-1: ENV</span></header>
+        <div class="envbox" data-env="aenv"></div>
+      </section>
+
+      <section class="mod m-lfo" aria-labelledby="h-lfo">
+        <header><h2 id="h-lfo">LFO</h2><span class="chip live">FM-1: LFO</span></header>
+        <div class="group"><span class="glabel">Onda</span><div class="seg" data-kind="p" data-id="P_LWAVE" data-type="lwave"></div></div>
+        <div class="row">
+          <div class="knob" data-kind="p" data-id="P_LRATE" data-fmt="lfo" data-label="Velocidade"></div>
+          <div class="knob small" data-kind="p" data-id="P_LD_PIT" data-fmt="bi" data-label="Afinação"></div>
+          <div class="knob small" data-kind="p" data-id="P_LD_FLT" data-fmt="bi" data-label="Filtro"></div>
+          <div class="knob small" data-kind="p" data-id="P_LD_SHP" data-fmt="bi" data-label="Pulso"></div>
+          <div class="knob small" data-kind="p" data-id="P_LD_AMP" data-fmt="pct" data-label="Volume"></div>
+          <div class="knob small" data-kind="p" data-id="P_LFADE" data-fmt="time" data-label="Fade in"></div>
+        </div>
+      </section>
+
+      <section class="mod m-voice" aria-labelledby="h-voice">
+        <header><h2 id="h-voice">Voz</h2><span class="chip live">FM-1: VOICE</span></header>
+        <div class="group"><span class="glabel">Modo</span><div class="seg" data-kind="p" data-id="P_VOICE" data-type="voice"></div></div>
+        <div class="row">
+          <div class="knob" data-kind="p" data-id="P_GLIDE" data-fmt="glide" data-label="Glide"></div>
+          <div class="knob" data-kind="p" data-id="P_DETUNE" data-fmt="int" data-label="Detune uníssono" id="k-detune"></div>
+        </div>
+      </section>
+
+      <section class="mod m-out" aria-labelledby="h-out">
+        <header><h2 id="h-out">Saída e efeitos</h2><span class="chip live">FM-1: FX</span></header>
+        <div class="outrow">
+          <div class="row">
+            <div class="knob" data-kind="p" data-id="P_LEVEL" data-fmt="db" data-label="Volume"></div>
+            <div class="knob small" data-kind="p" data-id="P_DIST" data-fmt="pct" data-label="Distorção"></div>
+            <div class="knob small" data-kind="p" data-id="P_CHOR" data-fmt="pct" data-label="Chorus"></div>
+            <div class="knob small" data-kind="p" data-id="P_DLY" data-fmt="pct" data-label="Delay"></div>
+            <div class="knob small" data-kind="p" data-id="P_REV" data-fmt="pct" data-label="Reverb"></div>
+          </div>
+          <div class="screen" aria-label="Osciloscópio da saída">
+            <canvas id="scope" width="600" height="220"></canvas>
+            <span class="state" id="scope-state">sem som</span>
+            <div class="meter"><i id="meter"></i></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="cheek" aria-hidden="true"></div>
+  </div>
+
+  <div class="kbbar">
+    <div class="left">
+      <button class="btn" id="octdn" type="button" aria-label="Oitava abaixo">Oitava &minus;</button>
+      <span class="oct" id="octname">C3</span>
+      <button class="btn" id="octup" type="button" aria-label="Oitava acima">Oitava +</button>
+      <button class="btn" id="hold" type="button" aria-pressed="false">Segurar</button>
+      <button class="btn" id="panic" type="button">Parar notas</button>
+    </div>
+    <span class="hint" id="midi-state">MIDI: procurando</span>
+  </div>
+  <div class="keyscroll"><div class="keys" id="keys" aria-label="Teclado"></div></div>
+  <p class="hint">Teclado do computador: A W S E D F T G Y H U J K O L P Ç toca, Z e X mudam a oitava, barra de espaço liga o Segurar. Arraste os knobs para cima e para baixo (Shift deixa mais fino), duplo clique volta ao padrão. Nos envelopes, arraste os pontos amarelos.</p>
+
+  <footer>
+    <p>Selva1 é um synth analógico da DeAbrew para o M-VAVE FM-1 e para o navegador, escrito sobre o SLOOP (isod89) e o Felucca (Leo Kuroshita), licença GPL-3.0. Aqui ele roda compilado para WebAssembly, com os mesmos números do aparelho: 44,1 kHz, 8 vozes, ponto fixo.</p>
+    <p>Os sons que você salva ficam só neste navegador. "Copiar patch" gera um texto com todos os valores, para guardar ou mandar para o FM-1 quando a etapa 2 estiver pronta.</p>
+  </footer>
+</div>
+
+<script>
+/*@IDS@*/
+/*@WORKLET@*/
+const WASM_B64 = "@WASM_B64@";
+
+(() => {
+  "use strict";
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+  const say = (t) => { $("#msg").textContent = t; };
+
+  // ---- the firmware's DSP on this thread: presets, ranges (no audio here)
+  const bytes = Uint8Array.from(atob(WASM_B64), (c) => c.charCodeAt(0));
+  const module = new WebAssembly.Module(bytes);
+  const w = new WebAssembly.Instance(module, {}).exports;
+  if (w._initialize) w._initialize();
+  w.preview_init();
+  w.preview_select(0, 0);
+  const NX = 14, NP = P.P_COUNT, E0 = P.P_E0;
+  const pid = (s) => (s[0] === "E" ? E0 + Number(s.slice(1)) : P[s]);
+  const desc = (kind, id) => {
+    const what = kind === "x" ? 1 : 0;
+    return { min: w.preview_desc(what, id, 0), max: w.preview_desc(what, id, 1), def: w.preview_desc(what, id, 2) };
+  };
+  const NAMES = [];
+  for (let i = 0; i < w.preview_npresets(); i++) {
+    const n = w.preview_preset_name(i);
+    NAMES.push(String.fromCharCode(...new Uint8Array(w.memory.buffer, w.preview_buffer(), n)));
+  }
+
+  const state = { p: new Int16Array(NP), x: new Int8Array(NX), preset: 0, user: -1 };
+  const readBack = () => {
+    for (let i = 0; i < NP; i++) state.p[i] = w.preview_get(0, i);
+    for (let i = 0; i < NX; i++) state.x[i] = w.preview_selva_get(0, i);
+  };
+
+  // ---- audio
+  let ctx = null, node = null, analyser = null, queue = [];
+  const send = (kind, a, b) => {
+    if (!node) return;
+    queue.push([kind, a, b]);
+    if (queue.length === 1) queueMicrotask(() => { node.port.postMessage(queue); queue = []; });
+  };
+  const fullSync = (presetIndex) => {
+    send("r", presetIndex, 0);
+    for (let i = 0; i < NP; i++) send("p", i, state.p[i]);
+    for (let i = 0; i < NX; i++) send("x", i, state.x[i]);
+  };
+  async function power() {
+    if (ctx && ctx.state === "running") {
+      allOff(); await ctx.suspend();
+      setPower(false); return;
+    }
+    try {
+      if (!ctx) {
+        ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100, latencyHint: "interactive" });
+        await ctx.resume();
+        const tries = [() => new URL("selva-worklet.js", location.href).href,
+          () => URL.createObjectURL(new Blob([WORKLET_SRC], { type: "text/javascript" })),
+          () => "data:text/javascript;charset=utf-8," + encodeURIComponent(WORKLET_SRC)];
+        let loaded = false, last = null;
+        for (const t of tries) {
+          try { await ctx.audioWorklet.addModule(t()); loaded = true; break; } catch (e) { last = e; }
+        }
+        if (!loaded) throw last;
+        node = new AudioWorkletNode(ctx, "selva", { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
+          processorOptions: { bytes: bytes.buffer.slice(0) } });
+        node.port.onmessage = ({ data }) => {
+          if (data.error) say("Erro no motor de áudio: " + data.error);
+          else if (data.peak != null) meter(data.peak);
+        };
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 2048;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.9;
+        node.connect(gain).connect(ctx.destination);
+        gain.connect(analyser);
+        fullSync(state.user >= 0 ? 0 : state.preset);
+        scopeLoop();
+      } else await ctx.resume();
+      setPower(true);
+      say(ctx.sampleRate === 44100 ? "Som ligado. Toque no teclado da tela, do computador ou num controlador MIDI."
+        : "Som ligado, mas o navegador está a " + ctx.sampleRate + " Hz: a afinação pode sair diferente do FM-1.");
+    } catch (e) {
+      say("Não deu para ligar o som neste navegador (" + (e && e.message || e) + "). Tente no Chrome ou no Edge.");
+    }
+  }
+  function setPower(on) {
+    $("#power").classList.toggle("on", on);
+    $("#power-label").textContent = on ? "Som ligado" : "Ligar o som";
+    $("#scope-state").textContent = on ? "saída" : "sem som";
+  }
+  $("#power").addEventListener("click", power);
+
+  // ---- value formats (as the FM-1 shows them)
+  const ms = (v) => TIME_MS_X10[v & 127] / 10;
+  const fmtTime = (v) => { const m = ms(v); return m < 10 ? m.toFixed(1) + " ms" : m < 1000 ? Math.round(m) + " ms" : (m / 1000).toFixed(m < 10000 ? 2 : 1) + " s"; };
+  const FMT = {
+    hz: (v) => { const h = CUTOFF_HZ[v & 127]; return h < 1000 ? h + " Hz" : (h / 1000).toFixed(h < 10000 ? 2 : 1) + " kHz"; },
+    time: fmtTime,
+    glide: (v) => (v ? fmtTime(v) : "off"),
+    pct: (v, d) => Math.round(v * 100 / (d.max || 127)) + "%",
+    bi: (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v * 100 / 64)),
+    db: (v) => (v ? ((v - 112) / 2).toFixed(1).replace("-", "−") + " dB" : "off"),
+    lfo: (v) => (LFO_HZ_X100[v & 127] / 100).toFixed(2) + " Hz",
+    semi: (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) + " st",
+    cents: (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) + " ct",
+    int: (v) => String(v),
+  };
+
+  // ---- knobs
+  const controls = [];    // {kind, id, el, d, update()}
+  const get = (kind, id) => (kind === "x" ? state.x[id] : state.p[id]);
+  function set(kind, id, v, from) {
+    const c = controls.find((k) => k.kind === kind && k.id === id);
+    const d = c ? c.d : desc(kind, id);
+    v = Math.max(d.min, Math.min(d.max, Math.round(v)));
+    if (get(kind, id) === v) return;
+    if (kind === "x") state.x[id] = v; else state.p[id] = v;
+    send(kind, id, v);
+    for (const k of controls) if (k.kind === kind && k.id === id && k !== from) k.update();
+    if (from) from.update();
+    envs.forEach((e) => e.draw());
+    if (kind === "p" && (id === E0 || id === E0 + 1)) drawResp();
+    if (kind === "p" && id === P.P_VOICE) $("#k-detune").classList.toggle("dim", v !== 3);
+    markEdited();
+  }
+  const A0 = -135, A1 = 135;
+  const polar = (cx, cy, r, deg) => { const a = (deg - 90) * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+  function knobSvg(bip) {
+    let t = "";
+    for (let i = 0; i <= 10; i++) {
+      const deg = A0 + (A1 - A0) * i / 10, [x1, y1] = polar(50, 50, 44, deg), [x2, y2] = polar(50, 50, i % 5 ? 49 : 51, deg);
+      t += `<line class="tick${i % 5 ? "" : " major"}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+    }
+    return `<svg viewBox="0 0 100 100" aria-hidden="true">${t}<path class="arc" d=""/>
+      <circle class="skirt" cx="50" cy="50" r="37"/><g class="rot"><circle class="cap" cx="50" cy="50" r="27"/>
+      <line class="ptr" x1="50" y1="48" x2="50" y2="26"/></g></svg>`;
+  }
+  function arcPath(from, to) {
+    if (Math.abs(to - from) < 0.5) return "";
+    const [x1, y1] = polar(50, 50, 40.5, Math.min(from, to)), [x2, y2] = polar(50, 50, 40.5, Math.max(from, to));
+    return `M${x1.toFixed(2)} ${y1.toFixed(2)} A40.5 40.5 0 ${Math.abs(to - from) > 180 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  }
+  function makeKnob(el) {
+    const kind = el.dataset.kind, id = kind === "x" || el.dataset.raw ? Number(el.dataset.id) : pid(el.dataset.id);
+    const d = desc(kind, id), fmt = FMT[el.dataset.fmt] || FMT.int, bip = d.min < 0;
+    el.innerHTML = knobSvg(bip) + `<span class="lab">${el.dataset.label}</span><span class="val"></span>`;
+    el.tabIndex = 0;
+    el.setAttribute("role", "slider");
+    el.setAttribute("aria-label", el.dataset.label);
+    el.setAttribute("aria-valuemin", d.min);
+    el.setAttribute("aria-valuemax", d.max);
+    const rot = $(".rot", el), arc = $(".arc", el), val = $(".val", el);
+    const c = { kind, id, el, d, update() {
+      const v = get(kind, id), t = (v - d.min) / (d.max - d.min), deg = A0 + (A1 - A0) * t;
+      rot.setAttribute("transform", `rotate(${deg.toFixed(1)} 50 50)`);
+      arc.setAttribute("d", arcPath(bip ? 0 : A0, deg));
+      val.textContent = fmt(v, d);
+      el.setAttribute("aria-valuenow", v);
+      el.setAttribute("aria-valuetext", fmt(v, d));
+    } };
+    let y0 = 0, v0 = 0, acc = 0;
+    el.addEventListener("pointerdown", (e) => {
+      el.setPointerCapture(e.pointerId); y0 = e.clientY; v0 = get(kind, id); acc = 0; el.focus(); e.preventDefault();
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!el.hasPointerCapture(e.pointerId)) return;
+      const span = d.max - d.min, px = e.shiftKey ? 600 : 180;
+      acc = (y0 - e.clientY) * span / px;
+      set(kind, id, v0 + acc, c);
+    });
+    el.addEventListener("dblclick", () => set(kind, id, d.def, c));
+    el.addEventListener("wheel", (e) => { e.preventDefault(); set(kind, id, get(kind, id) + (e.deltaY < 0 ? 1 : -1) * (e.shiftKey ? 1 : Math.max(1, (d.max - d.min) / 64)), c); }, { passive: false });
+    el.addEventListener("keydown", (e) => {
+      const big = Math.max(1, Math.round((d.max - d.min) / 10));
+      const m = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1, PageUp: big, PageDown: -big }[e.key];
+      if (m) { set(kind, id, get(kind, id) + m, c); e.preventDefault(); e.stopPropagation(); }
+      else if (e.key === "Home") { set(kind, id, d.min, c); e.preventDefault(); }
+      else if (e.key === "End") { set(kind, id, d.max, c); e.preventDefault(); }
+    });
+    controls.push(c);
+    return c;
+  }
+
+  // ---- switches
+  const WAVE_PATHS = [
+    "M2 12 L7 3 L12 12 L17 3 L22 12",
+    "M2 12 L9 3 L12 12 L19 3 L22 12",
+    "M2 12 L12 3 L12 12 L22 3 L22 12",
+    "M2 12 L2 3 L7 3 L7 12 L12 12 L12 3 L17 3 L17 12 L22 12",
+    "M2 12 L2 3 L5 3 L5 12 L12 12 L12 3 L15 3 L15 12 L22 12",
+    "M2 12 L2 3 L3.3 3 L3.3 12 L12 12 L12 3 L13.3 3 L13.3 12 L22 12",
+  ];
+  const WAVE_NAMES = ["Triângulo", "Triângulo-serra", "Serra", "Quadrada", "Pulso largo (30%)", "Pulso estreito (12%)"];
+  const SEGS = {
+    wave: WAVE_PATHS.map((p, i) => ({ html: `<svg viewBox="0 0 24 15"><path d="${p}"/></svg>`, title: WAVE_NAMES[i] })),
+    range: ["32'", "16'", "8'", "4'", "2'"].map((t) => ({ html: t, title: "Faixa " + t })),
+    sub: ["QUAD −1", "QUAD −2", "SENO −1", "SENO −2"].map((t) => ({ html: t, title: t.replace("QUAD", "Quadrada").replace("SENO", "Seno") + " oitava" })),
+    noise: ["BRANCO", "ROSA"].map((t) => ({ html: t, title: "Ruído " + t.toLowerCase() })),
+    ktr: ["OFF", "1/3", "2/3", "TOTAL"].map((t) => ({ html: t, title: "Teclado no corte: " + t })),
+    lwave: ["SENO", "TRI", "SERRA", "QUAD", "S&amp;H"].map((t) => ({ html: t, title: t })),
+    voice: ["POLY", "MONO", "LEGATO", "UNÍSSONO"].map((t) => ({ html: t, title: t })),
+  };
+  function makeSeg(el) {
+    const kind = el.dataset.kind, id = kind === "x" ? Number(el.dataset.id) : pid(el.dataset.id);
+    const items = SEGS[el.dataset.type], d = desc(kind, id);
+    el.setAttribute("role", "group");
+    el.innerHTML = items.map((it, i) => `<button type="button" data-v="${i + d.min}" title="${it.title}" aria-label="${it.title}">${it.html}</button>`).join("");
+    const c = { kind, id, el, d, update() {
+      const v = get(kind, id);
+      $$("button", el).forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.v) === v)));
+    } };
+    el.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) set(kind, id, Number(b.dataset.v), c); });
+    controls.push(c);
+    return c;
+  }
+
+  // ---- envelopes: a graph with three handles and four knobs
+  const envs = [];
+  function makeEnv(box) {
+    const fenv = box.dataset.env === "fenv";
+    const ids = fenv ? [E0 + 4, E0 + 5, E0 + 6, E0 + 7] : [P.P_ATK, P.P_DEC, P.P_SUS, P.P_REL];
+    const names = ["Attack", "Decay", "Sustain", "Release"], fmts = ["time", "time", "pct", "time"];
+    box.innerHTML = `<svg class="env" viewBox="0 0 320 130" role="img" aria-label="${fenv ? "Envelope do filtro" : "Envelope do volume"}">
+      <g class="gridg"></g><path class="area"/><path class="curve"/>
+      <circle class="hit" r="14" data-h="a"/><circle class="hit" r="14" data-h="d"/><circle class="hit" r="14" data-h="r"/>
+      <circle class="h" r="6" data-h="a"/><circle class="h" r="6" data-h="d"/><circle class="h" r="6" data-h="r"/>
+      <text class="ta" text-anchor="middle"></text><text class="td" text-anchor="middle"></text><text class="tr" text-anchor="middle"></text></svg>
+      <div class="envknobs">${ids.map((id, i) => `<div class="knob small" data-kind="p" data-id="${id}" data-raw="1" data-fmt="${fmts[i]}" data-label="${names[i]}"></div>`).join("")}</div>`;
+    $$(".knob", box).forEach(makeKnob);
+    const svg = $("svg", box), X0 = 12, W = 78, TOP = 14, BOT = 112, PLAT = 46;
+    const g = $(".gridg", svg);
+    let gl = "";
+    for (let i = 0; i <= 4; i++) { const y = TOP + (BOT - TOP) * i / 4; gl += `<line class="grid" x1="${X0}" y1="${y}" x2="310" y2="${y}"/>`; }
+    g.innerHTML = gl;
+    const geo = () => {
+      const [a, dd, s, r] = ids.map((id) => state.p[id]);
+      const xa = X0 + 2 + a / 127 * W, xd = xa + 2 + dd / 127 * W, ys = BOT - s / 127 * (BOT - TOP), xs = xd + PLAT, xr = xs + 2 + r / 127 * W;
+      return { xa, xd, ys, xs, xr };
+    };
+    const env = { draw() {
+      const { xa, xd, ys, xs, xr } = geo();
+      const c = `M${X0} ${BOT} L${xa.toFixed(1)} ${TOP} Q${xa.toFixed(1)} ${ys.toFixed(1)} ${xd.toFixed(1)} ${ys.toFixed(1)} L${xs.toFixed(1)} ${ys.toFixed(1)} Q${xs.toFixed(1)} ${BOT} ${xr.toFixed(1)} ${BOT}`;
+      $(".curve", svg).setAttribute("d", c);
+      $(".area", svg).setAttribute("d", c + ` L${X0} ${BOT} Z`);
+      const pos = { a: [xa, TOP], d: [xd, ys], r: [xr, BOT] };
+      $$("[data-h]", svg).forEach((h) => { const [x, y] = pos[h.dataset.h]; h.setAttribute("cx", x.toFixed(1)); h.setAttribute("cy", y.toFixed(1)); });
+      const t = (cls, x, y, s) => { const el = $(cls, svg); el.setAttribute("x", x.toFixed(1)); el.setAttribute("y", y); el.textContent = s; };
+      t(".ta", Math.min(250, xa + 34), TOP + 4, "A " + fmtTime(state.p[ids[0]]));
+      t(".td", Math.min(290, xd + 14), Math.max(24, ys - 9), "D " + fmtTime(state.p[ids[1]]));
+      t(".tr", Math.min(286, xr), 126, "R " + fmtTime(state.p[ids[3]]));
+    } };
+    let drag = null;
+    const toSvg = (e) => { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+    svg.addEventListener("pointerdown", (e) => {
+      const h = e.target.closest("[data-h]"); if (!h) return;
+      drag = h.dataset.h; svg.setPointerCapture(e.pointerId); e.preventDefault();
+      $$(`.h[data-h="${drag}"]`, svg).forEach((x) => x.classList.add("drag"));
+    });
+    svg.addEventListener("pointermove", (e) => {
+      if (!drag || !svg.hasPointerCapture(e.pointerId)) return;
+      const p = toSvg(e), { xa, xs } = geo();
+      if (drag === "a") set("p", ids[0], (p.x - X0 - 2) / W * 127);
+      else if (drag === "d") { set("p", ids[1], (p.x - xa - 2) / W * 127); set("p", ids[2], (BOT - p.y) / (BOT - TOP) * 127); }
+      else set("p", ids[3], (p.x - xs - 2) / W * 127);
+    });
+    const end = () => { drag = null; $$(".h", svg).forEach((x) => x.classList.remove("drag")); };
+    svg.addEventListener("pointerup", end);
+    svg.addEventListener("pointercancel", end);
+    envs.push(env);
+  }
+  // ---- build the panel
+  $$(".face .knob").forEach((k) => { if (!k.closest(".envbox")) makeKnob(k); });
+  $$(".seg").forEach(makeSeg);
+  $$(".envbox").forEach(makeEnv);
+
+  // the ladder's response (its analog prototype: comp / ((1 + s/wc)^4 + k)), CUT and RES as they are
+  function drawResp() {
+    const svg = $("#resp"), X0 = 4, X1 = 316, T = 8, B = 106, F0 = 20, F1 = 20000, DB0 = 18, DB1 = -48;
+    const fx = (f) => X0 + (X1 - X0) * Math.log(f / F0) / Math.log(F1 / F0), dy = (db) => T + (B - T) * (DB0 - db) / (DB0 - DB1);
+    const fc = CUTOFF_HZ[state.p[E0] & 127], k = state.p[E0 + 1] * 4.35 / 127, comp = 1 + k / 2;
+    let pts = "";
+    for (let i = 0; i <= 160; i++) {
+      const f = F0 * Math.pow(F1 / F0, i / 160), x = f / fc;
+      // (1 + jx)^4 + k
+      const re1 = 1, im1 = x;
+      let re = 1, im = 0;
+      for (let n = 0; n < 4; n++) { const r = re * re1 - im * im1; im = re * im1 + im * re1; re = r; }
+      re += k;
+      const db = Math.max(DB1, Math.min(DB0, 20 * Math.log10(comp / Math.hypot(re, im))));
+      pts += `${i ? "L" : "M"}${fx(f).toFixed(1)} ${dy(db).toFixed(1)}`;
+    }
+    let grid = "";
+    [100, 1000, 10000].forEach((f) => { grid += `<line class="grid" x1="${fx(f)}" y1="${T}" x2="${fx(f)}" y2="${B}"/><text x="${fx(f) + 3}" y="${B + 11}">${f >= 1000 ? f / 1000 + "k" : f}</text>`; });
+    [-12, -24, -36].forEach((db) => { grid += `<line class="grid" x1="${X0}" y1="${dy(db)}" x2="${X1}" y2="${dy(db)}"/>`; });
+    const lab = fc < 1000 ? fc + " Hz" : (fc / 1000).toFixed(fc < 10000 ? 2 : 1) + " kHz";
+    const lx = Math.min(X1 - 52, fx(fc) + 4);
+    svg.innerHTML = grid + `<line class="zero" x1="${X0}" y1="${dy(0)}" x2="${X1}" y2="${dy(0)}"/>` +
+      `<path class="area" d="${pts} L${X1} ${B} L${X0} ${B} Z"/><path class="curve" d="${pts}"/>` +
+      `<line class="fc" x1="${fx(fc)}" y1="${T}" x2="${fx(fc)}" y2="${B}"/><text x="${lx.toFixed(1)}" y="${T + 9}">${lab}</text>`;
+  }
+
+  function refreshAll() {
+    controls.forEach((c) => c.update());
+    envs.forEach((e) => e.draw());
+    drawResp();
+    $("#k-detune").classList.toggle("dim", state.p[P.P_VOICE] !== 3);
+  }
+
+  // ---- presets: the factory's (from the firmware) and the ones saved in this browser
+  const STORE = "selva1.sounds.v1";
+  const loadStore = () => { try { return JSON.parse(localStorage.getItem(STORE) || "[]"); } catch { return []; } };
+  const saveStore = (list) => { try { localStorage.setItem(STORE, JSON.stringify(list)); return true; } catch { return false; } };
+  let users = loadStore();
+  let edited = false;
+  function fillPresets() {
+    const sel = $("#preset");
+    sel.innerHTML = `<optgroup label="Sons de fábrica">${NAMES.map((n, i) => `<option value="f${i}">${String(i + 1).padStart(2, "0")} ${n}</option>`).join("")}</optgroup>` +
+      (users.length ? `<optgroup label="Salvos neste navegador">${users.map((u, i) => `<option value="u${i}">${u.name}</option>`).join("")}</optgroup>` : "");
+    sel.value = state.user >= 0 ? "u" + state.user : "f" + state.preset;
+    $("#del").hidden = state.user < 0;
+  }
+  function markEdited() {
+    if (edited) return;
+    edited = true;
+    const o = $("#preset").selectedOptions[0];
+    if (o && !o.textContent.endsWith(" *")) o.textContent += " *";
+  }
+  function loadFactory(i) {
+    i = (i + NAMES.length) % NAMES.length;
+    w.preview_preset(0, i);
+    readBack();
+    state.preset = i; state.user = -1; edited = false;
+    send("r", i, 0);
+    refreshAll(); fillPresets();
+    say("Som " + NAMES[i] + " carregado.");
+  }
+  function loadUser(i) {
+    const u = users[i]; if (!u) return;
+    w.preview_preset(0, 0);
+    for (let k = 0; k < NP; k++) if (u.p[k] != null) w.preview_param(0, k, u.p[k]);
+    for (let k = 0; k < NX; k++) if (u.x[k] != null) w.preview_selva(0, k, u.x[k]);
+    readBack();
+    state.user = i; edited = false;
+    fullSync(0);
+    refreshAll(); fillPresets();
+    say("Som " + u.name + " carregado.");
+  }
+  $("#preset").addEventListener("change", (e) => {
+    const v = e.target.value;
+    if (v[0] === "f") loadFactory(Number(v.slice(1))); else loadUser(Number(v.slice(1)));
+  });
+  const step = (dir) => {
+    const opts = $$("#preset option"), i = opts.findIndex((o) => o.value === $("#preset").value);
+    const v = opts[(i + dir + opts.length) % opts.length].value;
+    if (v[0] === "f") loadFactory(Number(v.slice(1))); else loadUser(Number(v.slice(1)));
+  };
+  $("#prev").addEventListener("click", () => step(-1));
+  $("#next").addEventListener("click", () => step(1));
+  $("#save").addEventListener("click", () => {
+    $("#saveform").hidden = false;
+    const base = state.user >= 0 ? users[state.user].name : NAMES[state.preset];
+    $("#savename").value = base;
+    $("#savename").focus(); $("#savename").select();
+  });
+  $("#savecancel").addEventListener("click", () => { $("#saveform").hidden = true; });
+  $("#saveform").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = $("#savename").value.trim().toUpperCase().slice(0, 24) || "SEM NOME";
+    const rec = { name, p: Array.from(state.p), x: Array.from(state.x) };
+    const at = users.findIndex((u) => u.name === name);
+    if (at >= 0) users[at] = rec; else users.push(rec);
+    if (!saveStore(users)) { say("Este navegador não deixou guardar. Use \"Copiar patch\" para não perder o som."); return; }
+    state.user = at >= 0 ? at : users.length - 1; edited = false;
+    $("#saveform").hidden = true; fillPresets();
+    say("Som " + name + " guardado neste navegador.");
+  });
+  let delArmed = false;
+  $("#del").addEventListener("click", () => {
+    if (state.user < 0) return;
+    if (!delArmed) { delArmed = true; $("#del").textContent = "Confirmar apagar"; say("Clique de novo para apagar " + users[state.user].name + "."); setTimeout(() => { delArmed = false; $("#del").textContent = "Apagar"; }, 4000); return; }
+    const name = users[state.user].name;
+    users.splice(state.user, 1); saveStore(users);
+    delArmed = false; $("#del").textContent = "Apagar";
+    say("Som " + name + " apagado.");
+    loadFactory(state.preset);
+  });
+  $("#copy").addEventListener("click", async () => {
+    const name = state.user >= 0 ? users[state.user].name : NAMES[state.preset];
+    const txt = JSON.stringify({ synth: "SELVA1", version: 1, name: name + (edited ? " (editado)" : ""), p: Array.from(state.p), x: Array.from(state.x) });
+    try { await navigator.clipboard.writeText(txt); say("Patch copiado. Cole num bloco de notas para guardar."); }
+    catch { say("O navegador não deixou copiar. O patch: " + txt); }
+  });
+
+  // ---- notes
+  const held = new Map();                // note -> source count
+  let hold = false, octave = 48;
+  const latched = new Set();
+  function noteOn(n, vel = 100) {
+    if (n < 0 || n > 127) return;
+    if (hold && latched.has(n)) { latched.delete(n); send("n", n, 0); keyLight(n, false); return; }
+    if (hold) latched.add(n);
+    send("n", n, vel); keyLight(n, true);
+    if (!ctx || ctx.state !== "running") say("Clique em Ligar o som para ouvir.");
+  }
+  function noteOff(n) {
+    if (hold) return;
+    send("n", n, 0); keyLight(n, false);
+  }
+  function allOff() {
+    for (let n = 0; n < 128; n++) keyLight(n, false);
+    latched.clear(); send("k", 0, 0);
+  }
+  $("#panic").addEventListener("click", allOff);
+  $("#hold").addEventListener("click", () => toggleHold());
+  function toggleHold() {
+    hold = !hold;
+    $("#hold").setAttribute("aria-pressed", String(hold));
+    $("#hold").classList.toggle("on", hold);
+    if (!hold) { for (const n of latched) { send("n", n, 0); keyLight(n, false); } latched.clear(); }
+  }
+
+  // the on-screen keys: two octaves and a C
+  const keys = $("#keys");
+  const BLACK = new Set([1, 3, 6, 8, 10]);
+  const PC = ["A", "W", "S", "E", "D", "F", "T", "G", "Y", "H", "U", "J", "K", "O", "L", "P", "Ç"];
+  function buildKeys() {
+    keys.innerHTML = "";
+    const whites = [];
+    for (let i = 0; i <= 24; i++) if (!BLACK.has(i % 12)) whites.push(i);
+    whites.forEach((i) => { const k = document.createElement("div"); k.className = "wk"; k.dataset.n = i; k.innerHTML = `<span>${PC[i] || ""}</span>`; keys.appendChild(k); });
+    const ww = 100 / whites.length;
+    for (let i = 0; i <= 24; i++) if (BLACK.has(i % 12)) {
+      const left = whites.indexOf(i - 1) + 1;
+      const k = document.createElement("div"); k.className = "bk"; k.dataset.n = i;
+      k.style.left = `calc(${(left * ww).toFixed(3)}% - ${(ww * 0.3).toFixed(3)}%)`; k.style.width = `${(ww * 0.6).toFixed(3)}%`;
+      k.innerHTML = `<span>${PC[i] || ""}</span>`; keys.appendChild(k);
+    }
+  }
+  buildKeys();
+  function keyLight(n, on) {
+    const el = keys.querySelector(`[data-n="${n - octave}"]`);
+    if (el) el.classList.toggle("down", on && (hold ? latched.has(n) : true));
+  }
+  const ptrNote = new Map();
+  const noteAt = (x, y) => { const el = document.elementFromPoint(x, y); const k = el && el.closest && el.closest("[data-n]"); return k && keys.contains(k) ? k : null; };
+  const velAt = (k, y) => { const r = k.getBoundingClientRect(); return Math.max(30, Math.min(127, Math.round(40 + (y - r.top) / r.height * 87))); };
+  keys.addEventListener("pointerdown", (e) => {
+    const k = noteAt(e.clientX, e.clientY); if (!k) return;
+    keys.setPointerCapture(e.pointerId); e.preventDefault();
+    const n = octave + Number(k.dataset.n); ptrNote.set(e.pointerId, n); noteOn(n, velAt(k, e.clientY));
+  });
+  keys.addEventListener("pointermove", (e) => {
+    if (!ptrNote.has(e.pointerId)) return;
+    const k = noteAt(e.clientX, e.clientY); if (!k) return;
+    const n = octave + Number(k.dataset.n), was = ptrNote.get(e.pointerId);
+    if (n !== was) { noteOff(was); ptrNote.set(e.pointerId, n); noteOn(n, velAt(k, e.clientY)); }
+  });
+  const ptrUp = (e) => { if (!ptrNote.has(e.pointerId)) return; noteOff(ptrNote.get(e.pointerId)); ptrNote.delete(e.pointerId); };
+  keys.addEventListener("pointerup", ptrUp);
+  keys.addEventListener("pointercancel", ptrUp);
+
+  const NOTE = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  function setOct(o) {
+    allOff();
+    octave = Math.max(24, Math.min(84, o));
+    $("#octname").textContent = NOTE[octave % 12] + (Math.floor(octave / 12) - 1);
+  }
+  $("#octdn").addEventListener("click", () => setOct(octave - 12));
+  $("#octup").addEventListener("click", () => setOct(octave + 12));
+
+  // the computer's keys (by position: works on ABNT2 too, where Ç is the key after L)
+  const CODES = ["KeyA", "KeyW", "KeyS", "KeyE", "KeyD", "KeyF", "KeyT", "KeyG", "KeyY", "KeyH", "KeyU", "KeyJ", "KeyK", "KeyO", "KeyL", "KeyP", "Semicolon"];
+  const down = new Map();
+  const typing = (e) => { const t = e.target; return t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable); };
+  window.addEventListener("keydown", (e) => {
+    if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.code === "Space") { if (!e.repeat) toggleHold(); e.preventDefault(); return; }
+    if (e.code === "KeyZ") { if (!e.repeat) setOct(octave - 12); return; }
+    if (e.code === "KeyX") { if (!e.repeat) setOct(octave + 12); return; }
+    const i = CODES.indexOf(e.code);
+    if (i < 0 || e.repeat || down.has(e.code)) return;
+    const n = octave + i; down.set(e.code, n); noteOn(n, 100); e.preventDefault();
+  });
+  window.addEventListener("keyup", (e) => { if (!down.has(e.code)) return; noteOff(down.get(e.code)); down.delete(e.code); });
+  window.addEventListener("blur", () => { for (const n of down.values()) noteOff(n); down.clear(); });
+
+  // MIDI in (a controller, or the FM-1's own keys over USB)
+  (async () => {
+    const st = $("#midi-state");
+    if (!navigator.requestMIDIAccess) { st.textContent = "MIDI: este navegador não tem Web MIDI"; return; }
+    try {
+      const acc = await navigator.requestMIDIAccess();
+      const hook = () => {
+        const ins = Array.from(acc.inputs.values());
+        ins.forEach((i) => { i.onmidimessage = midi; });
+        st.textContent = ins.length ? "MIDI: " + ins.map((i) => i.name).join(", ") : "MIDI: nenhum aparelho conectado";
+      };
+      acc.onstatechange = hook; hook();
+    } catch (e) { st.textContent = "MIDI: não liberado nesta página"; }
+  })();
+  let sustain = false;
+  const sustained = new Set();
+  function midi({ data }) {
+    const s = data[0] & 0xF0, a = data[1], b = data[2];
+    if (s === 0x90 && b) { sustained.delete(a); noteOn(a, b); }
+    else if (s === 0x80 || (s === 0x90 && !b)) { if (sustain) sustained.add(a); else noteOff(a); }
+    else if (s === 0xB0 && a === 64) { sustain = b >= 64; if (!sustain) { for (const n of sustained) noteOff(n); sustained.clear(); } }
+    else if (s === 0xB0 && a === 74) set("p", E0, Math.round(b * 127 / 127));
+  }
+
+  // ---- the scope and the meter
+  const cv = $("#scope"), g2 = cv.getContext("2d");
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const YEL = css("--yellow") || "#FFC700";
+  function scopeLoop() {
+    const buf = new Float32Array(analyser.fftSize);
+    const drawFrame = () => {
+      requestAnimationFrame(drawFrame);
+      if (document.hidden || !ctx || ctx.state !== "running") return;
+      analyser.getFloatTimeDomainData(buf);
+      let start = 0;
+      for (let i = 1; i < buf.length / 2; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { start = i; break; }
+      const W2 = cv.width, H = cv.height;
+      g2.clearRect(0, 0, W2, H);
+      g2.strokeStyle = "#1b1a18"; g2.lineWidth = 1;
+      for (let i = 1; i < 6; i++) { g2.beginPath(); g2.moveTo(0, H * i / 6); g2.lineTo(W2, H * i / 6); g2.stroke(); }
+      g2.strokeStyle = YEL; g2.lineWidth = 2.2; g2.beginPath();
+      const n = 1024;
+      for (let i = 0; i < n; i++) { const x = i / (n - 1) * W2, y = H / 2 - buf[start + i] * H * 0.45; i ? g2.lineTo(x, y) : g2.moveTo(x, y); }
+      g2.stroke();
+    };
+    drawFrame();
+  }
+  function meter(pk) { $("#meter").style.width = Math.min(100, pk * 100 / 0.56) + "%"; }
+  (function idleScope() {
+    const W2 = cv.width, H = cv.height;
+    g2.strokeStyle = "#1b1a18"; g2.lineWidth = 1;
+    for (let i = 1; i < 6; i++) { g2.beginPath(); g2.moveTo(0, H * i / 6); g2.lineTo(W2, H * i / 6); g2.stroke(); }
+    g2.strokeStyle = "#5c4b00"; g2.lineWidth = 2; g2.beginPath(); g2.moveTo(0, H / 2); g2.lineTo(W2, H / 2); g2.stroke();
+  })();
+
+  // ---- start: the first factory sound
+  loadFactory(0);
+  setOct(48);
+  say("Escolha um som e clique em Ligar o som.");
+})();
+</script>
