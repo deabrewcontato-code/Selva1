@@ -211,7 +211,8 @@ void Selva1Processor::handle(const Msg& m)
         case mPanic: s1_panic(); s1_transport(0); break;
         case mArm:
             armedAudio = m.a != 0;
-            freeRun = armedAudio && !wasPlaying;      /* armed with the host stopped: run now, on our own */
+            /* armed with the host stopped: run now, on our own; a project being loaded only arms (b = 1) */
+            freeRun = armedAudio && !wasPlaying && m.b < 0.5f;
             if (!armedAudio)
                 s1_transport(0);
             else if (freeRun)
@@ -363,7 +364,7 @@ void Selva1Processor::setStateInformation(const void* data, int sizeInBytes)
         for (size_t i = 0; i < steps.size(); i++)
             post({ mSet, inf.seqBase + (int)i, steps[i] });
     }
-    post({ mArm, seqArmed ? 1 : 0, 0 });
+    post({ mArm, seqArmed ? 1 : 0, 1.f });
     stateVersion++;
 }
 
