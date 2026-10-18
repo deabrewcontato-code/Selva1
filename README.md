@@ -6,8 +6,8 @@ que roda em três lugares:
 | Onde | Como | Estado |
 | --- | --- | --- |
 | **Navegador** | WebAssembly + AudioWorklet | no ar: **https://deabrewmusic.com.br/selva1/** |
-| **DAW** (Mac: AU e VST3; Windows: VST3) | plugin JUCE 8 com o mesmo painel numa web view | compilado pelo GitHub (Actions) |
-| **M-VAVE FM-1** | firmware baseado no SLOOP, com o motor SELVA1 | compilado pelo GitHub (Actions) |
+| **DAW** (Mac: AU e VST3; Windows: VST3) | plugin JUCE 8 com o mesmo painel numa web view | baixe em **Releases** |
+| **M-VAVE FM-1** | firmware baseado no SLOOP, com o motor SELVA1 | instalador: **https://deabrewmusic.com.br/selva1/fm1/** |
 
 ## O som
 
@@ -49,7 +49,8 @@ web/                 o painel: index.html, app.js, worklet.js, presets.js, fonts
 plugin/              o plugin (JUCE 8): CMakeLists.txt, src/
 firmware/            o firmware do FM-1 (SLOOP + SELVA1)
 tools/               build_wasm.sh, build.py (páginas), render_presets.mjs (volumes dos sons)
-.github/workflows/   tudo compilado no GitHub; uma tag v* publica uma release
+.github/workflows/   tudo compilado no GitHub; uma tag v* ou um commit com [release] publica uma release
+RELEASE.md           o texto da release (como baixar e instalar)
 ```
 
 ## Compilar à mão
