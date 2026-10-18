@@ -162,20 +162,36 @@ jobs:
             selva1-fm1-0.1.fwsc
             fm1-site/
 
+  # A release comes from a tag v*, or from a push to main whose message has [release]: then the tag is
+  # v<version in plugin/CMakeLists.txt>, made here on the commit that was built.
   release:
     name: Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[release]'))
     needs: [mac, windows, linux, fm1]
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
       - uses: actions/download-artifact@v4
         with:
           path: art
+      - name: Version and notes
+        id: v
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then T="${GITHUB_REF_NAME}"; else
+            T="v$(sed -n 's/^project(Selva1 VERSION \([0-9.]*\).*/\1/p' src/plugin/CMakeLists.txt)"; fi
+          echo "tag=$T" >> "$GITHUB_OUTPUT"
+          cp src/RELEASE.md notes.md
       - name: Pack the FM-1 files
         run: |
           cd art/Selva1-FM1 && zip -qr ../../Selva1-FM1-instalador.zip fm1-site && cp selva1-fm1-0.1.fwsc ../../
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Selva1 ${{ steps.v.outputs.tag }}
+          body_path: notes.md
           files: |
             art/Selva1-mac/Selva1-mac.zip
             art/Selva1-windows/Selva1-windows.zip
