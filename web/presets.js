@@ -1,7 +1,7 @@
 /* Selva1 · the factory sounds. Each one: n (the name), b (the bank), p (the parameters that differ from
  * INIT, by key), m (the matrix: [source, destination, amount], by name), s (the sequencer lanes, 16 steps).
  * Banks: A CONCRETE (basses), B ASFALTO (leads, plucks), C GAROA (pads), D USINA (sequences, rhythm, FX).
- * Copyright (C) 2026 DeAbrew. */
+ * Sequencer lanes: gate, note, velo, accent, slide, prob, m1-m4. Copyright (C) 2026 DeAbrew. */
 const PRESETS = [
   /* ---------------------------------------------------------------- A / CONCRETE --- */
   { n: "SUBTERRÂNEO", b: "A",
@@ -17,14 +17,16 @@ const PRESETS = [
       "fx.dist.on": 1, "fx.dist.type": 1, "fx.dist.drive": 0.45, "fx.dist.mix": 0.7, "fx.comp.on": 1, "fx.comp.amount": 0.4 },
     m: [["LFO 1", "OSC A POS", 0.35], ["ENV 2", "FILTER CUTOFF", 0.3], ["MACRO 1", "OSC A POS", 0.5]] },
   { n: "MARGINAL", b: "A",
-    p: { "amp.level": 0.41, "voice.mode": 2, "voice.glide": 0.06, "osc.a.oct": -1, "osc.a.level": 0.85, "flt.cutoff": 320, "flt.res": 0.82, "flt.drive": 0.45,
+    p: { "amp.level": 0.35, "voice.mode": 1, "osc.a.oct": -1, "osc.a.level": 0.85, "flt.cutoff": 320, "flt.res": 0.82, "flt.drive": 0.45,
       "flt.key": 0.4, "env1.a": 0.001, "env1.d": 0.3, "env1.s": 0.9, "env1.r": 0.05, "env2.a": 0.001, "env2.d": 0.22, "env2.s": 0, "env2.r": 0.1,
-      "fx.dist.on": 1, "fx.dist.drive": 0.5, "fx.dist.mix": 0.8, "fx.dly.on": 1, "fx.dly.fb": 0.3, "fx.dly.mix": 0.15, "global.bpm": 128 },
-    m: [["ENV 2", "FILTER CUTOFF", 0.5], ["SEQ MOD 1", "FILTER CUTOFF", 0.25], ["MACRO 1", "FILTER RES", 0.2]],
-    s: { gate: [0.5, 0.5, 0, 0.5, 0.99, 0.5, 0.5, 0, 0.5, 0.3, 0.5, 0, 0.99, 0.5, 0, 0.5],
+      "fx.dist.on": 1, "fx.dist.drive": 0.5, "fx.dist.mix": 0.8, "fx.dly.on": 1, "fx.dly.fb": 0.3, "fx.dly.mix": 0.15, "global.bpm": 128,
+      "seq.accent": 0.75, "seq.slide": 0.07 },
+    m: [["ENV 2", "FILTER CUTOFF", 0.5], ["MACRO 1", "FILTER RES", 0.2]],
+    s: { gate: [0.5, 0.5, 0, 0.5, 0.5, 0.5, 0.5, 0, 0.5, 0.5, 0.5, 0, 0.5, 0.5, 0, 0.5],
       note: [0, 0, 12, 0, 0, 3, 0, 0, 7, 0, 12, 0, 0, 10, 0, -2],
       velo: [1, 0.7, 0.8, 0.7, 1, 0.6, 0.8, 0.8, 1, 0.7, 0.9, 0.8, 1, 0.7, 0.8, 0.7],
-      m1: [1, 0, 0, 0, 1, 0, 0, 0, 0.6, 0, 1, 0, 0, 0, 0, 0.5] } },
+      accent: [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1],
+      slide: [0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0] } },
   { n: "BRÁS", b: "A",
     p: { "amp.level": 0.44, "voice.mode": 1, "osc.a.mode": 2, "osc.a.ratio": 3, "osc.a.pos": 0.35, "osc.a.oct": -1, "sub.on": 1, "sub.level": 0.45,
       "flt.route.sub": 0, "flt.cutoff": 2400, "flt.res": 0.1, "env1.d": 0.4, "env1.s": 0.7, "env1.r": 0.1,
@@ -122,7 +124,8 @@ const PRESETS = [
     s: { gate: [0.55, 0, 0.55, 0, 0.55, 0.55, 0, 0.55, 0, 0.55, 0, 0.55, 0.55, 0, 0.55, 0],
       note: [0, 0, 0, 0, 7, 0, 0, 3, 0, 0, 0, 10, 0, 0, 12, 0],
       m1: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 0.8, 0.6, 0.4, 0.2, 0],
-      m2: [1, 0, 0, 0, 0.5, 0, 0, 0, 1, 0, 0, 0, 0.5, 0, 0.8, 0] } },
+      m2: [1, 0, 0, 0, 0.5, 0, 0, 0, 1, 0, 0, 0, 0.5, 0, 0.8, 0],
+      accent: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0] } },
   { n: "LINHA AMARELA", b: "D",
     p: { "amp.level": 0.94, "arp.on": 1, "arp.mode": 2, "arp.rate": 3, "arp.oct": 2, "arp.gate": 0.5, "osc.a.mode": 0, "osc.a.table": 5, "osc.a.pos": 0.5,
       "osc.a.unison": 2, "env1.a": 0.001, "env1.d": 0.3, "env1.s": 0.2, "env1.r": 0.2, "env2.a": 0.001, "env2.d": 0.25, "env2.s": 0,

@@ -232,6 +232,18 @@ select.sel option { background: #161514; color: var(--cream); }
 
 
 /* added controls */
+.seqbox { grid-template-columns: 52px minmax(0, 1fr); row-gap: 4px; }
+.tlbl { font-size: 9px; letter-spacing: .1em; color: var(--concrete); align-self: center; justify-self: end; }
+.tlbl.acc { color: var(--red-text); } .tlbl.sld { color: var(--kraft); }
+.trow { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; padding: 0 4px; touch-action: none; user-select: none; }
+.tc { height: 18px; background: #141312; border: 1px solid var(--line); padding: 0; cursor: pointer; position: relative; }
+.tc:nth-child(4n+1) { box-shadow: inset 1px 0 0 var(--line-hi); }
+.trow.acc .tc[aria-pressed="true"] { background: var(--red); border-color: var(--red); }
+.trow.sld .tc[aria-pressed="true"] { background: var(--kraft); border-color: var(--kraft); }
+.trow.sld .tc[aria-pressed="true"]::after { content: ""; position: absolute; left: 60%; right: -4px; top: 50%; height: 2px; background: var(--kraft); }
+.tc.rest { opacity: .45; } .tc.out { opacity: .25; }
+.tc.now { outline: 1px solid var(--cream); outline-offset: -1px; }
+
 #macros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 
 #mxfull .mxr { grid-template-columns: 30px minmax(0, 240px) 18px minmax(0, 280px) minmax(140px, 1fr); gap: 8px; }
@@ -256,7 +268,8 @@ select.sel option { background: #161514; color: var(--cream); }
 .oscscreen .cap { left: 40px; }
 .seqctl .stack select.sel { padding: 4px 24px 4px 7px; font-size: 11px; }
 .lanes button { padding: 5px 8px; }
-.seqbig .seqbox { grid-template-columns: 44px minmax(0, 1fr); }
+.seqbig .seqbox { grid-template-columns: 56px minmax(0, 1fr); }
+.seqbig .tc { height: 26px; }
 .seqbig .stp b { font-size: 11px; top: 4px; }
 .keys .wk, .keys .bk { cursor: pointer; }
 

@@ -117,6 +117,7 @@ typedef struct { float ic1, ic2, ic3, ic4; } svf_t;
 typedef struct {
     int active, gate, note, age, fade;      /* fade: samples left of a steal fade, 0 = none */
     float vel, pitch, target, rnd;          /* pitch in semitones (glides), rnd: RANDOM source */
+    float acc, acc_env, slide;              /* the sequencer's ACCENT (this note, its sweep) and SLIDE time */
     float ph[3][MAXU], ph2[3][MAXU];        /* phases: oscillator, FM modulator */
     uint32_t nst[3];                        /* the oscillators' noise */
     float subph;
@@ -507,6 +508,7 @@ static void voice_sources(voice_t *v)
         s[SRC_SEQ1 + k] = seqmod[k];
     }
     s[SRC_RAND] = v->rnd;
+    s[SRC_ACCENT] = v->acc_env * pv[P_SEQ_ACC];
 }
 static void voice_offsets(voice_t *v)
 {
@@ -523,6 +525,7 @@ static void voice_block(voice_t *v, float *outl, float *outr, int n)
     oscblk_t ob[3];
     float e1prev, e1, cut, res, drv, G, g, kk, gain, amp, apan, gl_, gr_, glide, sub_lvl, nz_lvl, nz_col, key;
     /* modulation sources first: the envelopes 2 and 3, the LFOs (their rates modulated by last block's offsets) */
+    v->acc_env *= s1_exp(-(float)n / (0.16f * sr));   /* the accent sweep fades in ~0.5 s */
     voice_sources(v);
     e1prev = v->env[0].v;
     v->src[SRC_ENV2] = env_run(&v->env[1], 1, (float)n);
@@ -532,7 +535,7 @@ static void voice_block(voice_t *v, float *outl, float *outr, int n)
     v->src[SRC_ENV1] = e1prev;
     voice_offsets(v);
     /* pitch: glide toward the note */
-    glide = pv[P_GLIDE];
+    glide = v->slide > 0 ? v->slide : pv[P_GLIDE];
     if (glide > 0.0011f)
         v->pitch = v->target + (v->pitch - v->target) * s1_exp(-(float)n / (glide * sr * 0.4f));
     else
@@ -592,9 +595,10 @@ static void voice_block(voice_t *v, float *outl, float *outr, int n)
     fmode = PI_(P_FLT_MODE);
     fslope = PI_(P_FLT_SLOPE);
     key = pv[P_FLT_KEY] * (v->pitch - 60.f) / 12.f;
-    cut = val_of(P_FLT_CUT, pn[P_FLT_CUT] + v->off[DST_CUT]) * s1_exp2(key);
-    cut = s1_clamp(cut, 8.f, 0.45f * sr);
     res = val_of(P_FLT_RES, pn[P_FLT_RES] + v->off[DST_RES]);
+    cut = val_of(P_FLT_CUT, pn[P_FLT_CUT] + v->off[DST_CUT] + pv[P_SEQ_ACC] * v->acc_env * (0.14f + 0.22f * res)) *
+          s1_exp2(key);
+    cut = s1_clamp(cut, 8.f, 0.45f * sr);
     drv = val_of(P_FLT_DRIVE, pn[P_FLT_DRIVE] + v->off[DST_FDRIVE]);
     g = s1_tanpi(cut * isr);
     G = g / (1.f + g);
@@ -630,6 +634,7 @@ static void voice_block(voice_t *v, float *outl, float *outr, int n)
         float lvl = val_of(P_AMP_LEVEL, pn[P_AMP_LEVEL] + v->off[DST_AMP]);
         apan = val_of(P_AMP_PAN, pn[P_AMP_PAN] + v->off[DST_APAN]);
         gain = velg * lvl * lvl * 2.6f;            /* (+8 dB: one saw at INIT peaks near -7 dBFS) */
+        gain *= 1.f + pv[P_SEQ_ACC] * v->acc;          /* ACCENT: up to +6 dB */
         gl_ = s1_cos01((apan + 1.f) * 0.125f) * 1.41421f;
         gr_ = s1_sin01((apan + 1.f) * 0.125f) * 1.41421f;
     }
@@ -918,6 +923,8 @@ static void voice_start(voice_t *v, int note, float vel, int legato)
         }
         v->rnd = s1_randb(&sd);
     }
+    v->slide = 0;                           /* (a SLIDE is set by the sequencer after this) */
+    v->acc = 0;
     v->active = 1;
     v->gate = 1;
     v->fade = 0;
@@ -945,6 +952,8 @@ static void voice_on(int note, float vel)
             v->fade = 0;
             for (k = 0; k < 3; k++)
                 v->env[k].stage = 1;
+            v->slide = 0;
+            v->acc = 0;
             if (pv[P_GLIDE] <= 0.0011f)
                 v->pitch = (float)note;
             newest = 0;
@@ -1022,7 +1031,17 @@ static void voice_off(int note)
 static int seq_playing, seq_step = -1, seq_dir = 1, seq_note_on = -1;
 static double seq_clock;                     /* samples into the current step */
 static double seq_step_len, seq_gate_len;
-static int seq_root = 48;
+static int seq_root = 48, seq_slide_from;
+/* the voice sounding a note now (the newest if several) */
+static voice_t *voice_of(int note)
+{
+    voice_t *best = 0;
+    int i;
+    for (i = 0; i < MAXV; i++)
+        if (V[i].active && V[i].gate && !V[i].fade && V[i].note == note && (!best || V[i].age > best->age))
+            best = &V[i];
+    return best;
+}
 static uint32_t seq_seed = 0xBEEF123u;
 static int arp_idx, arp_note_on = -1, arp_dir = 1, arp_count;
 static double arp_clock, arp_len, arp_gate;
@@ -1085,8 +1104,8 @@ static void seq_run(int n)
         seq_note_on = -1;
     }
     if (seq_step < 0 || seq_clock >= seq_step_len) {
-        float gate, prob, velo;
-        int note, k;
+        float gate, prob, velo, acc;
+        int note, k, slide;
         if (seq_step >= 0)
             seq_clock -= seq_step_len;
         else
@@ -1097,19 +1116,41 @@ static void seq_run(int n)
         gate = steplane(seq_step, LANE_GATE);
         prob = steplane(seq_step, LANE_PROB);
         velo = steplane(seq_step, LANE_VELO);
+        acc = steplane(seq_step, LANE_ACC) > 0.5f ? 1.f : 0.f;
+        slide = steplane(seq_step, LANE_SLIDE) > 0.5f;
         for (k = 0; k < 4; k++)
             seqmod[k] = steplane(seq_step, LANE_M1 + k);
-        if (seq_note_on >= 0) {
-            voice_off(seq_note_on);
-            seq_note_on = -1;
-        }
         if (gate > 0.01f && s1_randf(&seq_seed) < prob) {
             int root = nheld ? held[nheld - 1] : seq_root;
+            voice_t *sv = seq_slide_from && seq_note_on >= 0 ? voice_of(seq_note_on) : 0;
             note = root + (int)steplane(seq_step, LANE_NOTE) + PI_(P_SEQ_OCT) * 12;
             note = note < 0 ? 0 : note > 127 ? 127 : note;
-            voice_on(note, s1_clamp(velo, 0.05f, 1.f));
+            if (sv) {                        /* SLIDE from the step before: the same voice glides, no attack */
+                sv->note = note;
+                sv->target = (float)note;
+                sv->slide = pv[P_SEQ_SLIDE];
+                sv->vel = s1_clamp(velo, 0.05f, 1.f);
+                newest = (int)(sv - V);
+            } else {
+                if (seq_note_on >= 0)
+                    voice_off(seq_note_on);
+                voice_on(note, s1_clamp(velo, 0.05f, 1.f));
+            }
+            if (newest >= 0) {
+                voice_t *v = &V[newest];
+                v->acc = acc;
+                if (acc > 0)                 /* accents in a row push the sweep higher */
+                    v->acc_env = s1_min(1.6f, v->acc_env * 0.6f + 1.f);
+            }
             seq_note_on = note;
-            seq_gate_len = seq_step_len * (double)(gate >= 0.99f ? 1.02f : gate);
+            /* a SLIDE step holds its note until the next step takes it over */
+            seq_gate_len = slide ? 1e18 : seq_step_len * (double)(gate >= 0.99f ? 1.02f : gate);
+            seq_slide_from = slide;
+        } else {
+            if (seq_note_on >= 0)
+                voice_off(seq_note_on);
+            seq_note_on = -1;
+            seq_slide_from = 0;
         }
     }
 }
@@ -1212,13 +1253,24 @@ S1_EXPORT void s1_init(float rate)
         pn[i] = norm_of(i, pv[i]);
     }
     for (i = 0; i < S1_STEPS; i++) {
-        pv[S1_SEQ_ID(i, LANE_GATE)] = 0;
-        pv[S1_SEQ_ID(i, LANE_NOTE)] = 0;
-        pv[S1_SEQ_ID(i, LANE_VELO)] = 0.8f;
-        pv[S1_SEQ_ID(i, LANE_PROB)] = 1;
-        pv[S1_SEQ_ID(i, LANE_M1)] = pv[S1_SEQ_ID(i, LANE_M2)] = pv[S1_SEQ_ID(i, LANE_M3)] = pv[S1_SEQ_ID(i, LANE_M4)] = 0;
+        int l;
+        for (l = 0; l < S1_LANES; l++)
+            pv[S1_SEQ_ID(i, l)] = LANE_DEF[l];
     }
     memset(V, 0, sizeof V);
+    /* the playing state too: no keys held, sequencer and arp stopped */
+    nheld = 0;
+    sustain_on = 0;
+    memset(sustained, 0, sizeof sustained);
+    modwh = after = bend = 0;
+    seq_playing = 0;
+    seq_step = -1;
+    seq_note_on = arp_note_on = -1;
+    seq_slide_from = 0;
+    narp = narp_chord = 0;
+    newest = -1;
+    for (i = 0; i < 4; i++)
+        seqmod[i] = 0;
     matrix_rebuild();
     rev_setup(pv[P_REV_SIZE]);
     inited = 1;
@@ -1355,6 +1407,7 @@ S1_EXPORT void s1_transport(int play)
             voice_off(seq_note_on);
         seq_note_on = -1;
         seq_step = -1;
+        seq_slide_from = 0;
         { int k; for (k = 0; k < 4; k++) seqmod[k] = 0; }
     }
 }

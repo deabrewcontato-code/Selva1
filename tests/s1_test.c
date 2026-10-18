@@ -211,6 +211,52 @@ static void sequencer(void)
     CHECK(onsets >= 7 && onsets <= 9, "sequencer: %d notes", onsets);
 }
 
+/* 303: a SLIDE step glides into the next without a new attack; an ACCENT step is louder and brighter */
+static void slide_accent(void)
+{
+    int i, n = 6000;                          /* 1/16 at 120 BPM: 6000 samples a step */
+    float mid, a0, a1;
+    reset();
+    set("global.bpm", 120);
+    set("seq.rate", 2);
+    set("voice.mode", 1);
+    set("env1.a", 0.05f);
+    set("seq.slide", 0.08f);
+    s1_set(S1_SEQ_ID(0, LANE_GATE), 0.5f);
+    s1_set(S1_SEQ_ID(0, LANE_SLIDE), 1);
+    s1_set(S1_SEQ_ID(1, LANE_GATE), 0.5f);
+    s1_set(S1_SEQ_ID(1, LANE_NOTE), 12);
+    set("seq.len", 2);
+    s1_transport(1);
+    render(n + 600);                          /* into step 2 by 600 samples */
+    mid = V[0].pitch;
+    CHECK(V[0].active && V[0].gate, "slide: the note did not hold into the next step");
+    CHECK(mid > 48.5f && mid < 59.5f, "slide: pitch %.2f is not between the two notes (gliding)", mid);
+    CHECK(V[0].env[0].stage != 1, "slide: the envelope started a new attack");
+    render(n - 1200);
+    CHECK(fabsf(V[0].pitch - 60.f) < 0.5f, "slide: did not arrive (%.2f)", V[0].pitch);
+    s1_transport(0);
+    printf("s1: slide: 600 samples after the step, the pitch is at %.2f on its way from 48 to 60, no new attack\n", mid);
+    /* accent: the same two notes, the first accented; compare their loudness */
+    reset();
+    set("global.bpm", 120);
+    set("seq.rate", 2);
+    set("seq.len", 2);
+    set("flt.cutoff", 400);
+    set("flt.res", 0.6f);
+    set("env1.d", 0.1f);
+    set("env1.s", 0.3f);
+    for (i = 0; i < 2; i++)
+        s1_set(S1_SEQ_ID(i, LANE_GATE), 0.5f);
+    s1_set(S1_SEQ_ID(0, LANE_ACC), 1);
+    s1_transport(1);
+    a0 = render(n).rms;
+    a1 = render(n).rms;
+    s1_transport(0);
+    CHECK(a0 > a1 * 1.3f, "accent: the accented step is not louder (%.4f vs %.4f)", a0, a1);
+    printf("s1: accent: the accented step %+.1f dB over the plain one\n", 20.f * log10f(a0 / a1));
+}
+
 static void cost(void)
 {
     clock_t t0;
@@ -249,6 +295,7 @@ int main(int argc, char **argv)
     tails();
     tuning();
     sequencer();
+    slide_accent();
     cost();
     /* a short demo: a chord through each wavetable */
     {

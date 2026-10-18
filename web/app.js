@@ -6,9 +6,11 @@
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const K_LIN = 0, K_EXP = 1, K_INT = 2, K_ENUM = 3, K_BOOL = 4, K_BIP = 5;
-  const LANES = ["gate", "note", "velo", "prob", "m1", "m2", "m3", "m4"];
-  const LANE_LABEL = ["GATE", "NOTE", "VELO", "PROB", "MOD 1", "MOD 2", "MOD 3", "MOD 4"];
-  const LANE_DEF = [0, 0, 0.8, 1, 0, 0, 0, 0];
+  /* the sequencer's lanes, in the engine's order; ACCENT and SLIDE (TB-303) are on/off rows of their own */
+  const LANES = ["gate", "note", "velo", "accent", "slide", "prob", "m1", "m2", "m3", "m4"];
+  const LANE_DEF = [0, 0, 0.8, 0, 0, 1, 0, 0, 0, 0];
+  const L_GATE = 0, L_NOTE = 1, L_ACC = 3, L_SLIDE = 4, L_M1 = 6;
+  const LANE_TABS = [[0, "GATE"], [1, "NOTE"], [2, "VELO"], [5, "PROB"], [6, "MOD 1"], [7, "MOD 2"], [8, "MOD 3"], [9, "MOD 4"]];
   const BIPOLAR = new Set(["LFO 1", "LFO 2", "LFO 3", "KEY", "BEND", "RANDOM"]);
   const BANKS = { A: "CONCRETE", B: "ASFALTO", C: "GAROA", D: "USINA", U: "USUÁRIO" };
   const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -34,7 +36,8 @@
     while (m[e]) e++;
     return new TextDecoder().decode(m.subarray(ptr, e));
   }
-  const seqId = (step, lane) => SEQ0 + step * 8 + lane;
+  let NL = 10;                               /* lanes a step (from the engine) */
+  const seqId = (step, lane) => SEQ0 + step * NL + lane;
   const id = (key) => BYKEY[key].id;
   const val = (key) => VALUES[BYKEY[key].id];
 
@@ -88,7 +91,7 @@
     const k = p.key;
     if (p.opts) return p.opts[Math.round(v)] || "";
     if (k === "voice.glide") return v <= 0.0011 ? "OFF" : fmtTime(v);
-    if (/^env\d\.[adr]$/.test(k)) return fmtTime(v);
+    if (/^env\d\.[adr]$/.test(k) || k === "seq.slide") return fmtTime(v);
     if (k === "flt.cutoff" || /^lfo\d\.rate$/.test(k) || k === "fx.cho.rate") return fmtHz(v);
     if (/\.pan$/.test(k)) return Math.abs(v) < 0.005 ? "C" : (v < 0 ? "L " : "R ") + Math.round(Math.abs(v) * 100);
     if (/\.fine$/.test(k) || k === "global.tune") return (v > 0 ? "+" : "") + Math.round(v) + " ct";
@@ -1036,7 +1039,7 @@
     const s = el.dataset.src;
     if (s === "env") return "ENV " + (envTab + 1);
     if (s === "lfo") return "LFO " + (lfoTab + 1);
-    if (s === "seq") { const l = el.closest(".mod").querySelector(".sequi").lane || 4; return "SEQ MOD " + (l >= 4 ? l - 3 : 1); }
+    if (s === "seq") { const l = el.closest(".mod").querySelector(".sequi").lane || 0; return "SEQ MOD " + (l >= L_M1 ? l - L_M1 + 1 : 1); }
     return s;
   }
   function dragLabels() { $$(".drag[data-src]").forEach((el) => { $("span", el).textContent = srcOf(el); el.title = "Arraste até um knob para modular"; }); }
@@ -1050,14 +1053,40 @@
       <label class="stack"><span class="lbl">LENGTH</span><select class="sel" data-k="seq.len"></select></label>
       <label class="stack"><span class="lbl">DIRECTION</span><select class="sel" data-k="seq.dir"></select></label>
       <div class="stepper" data-k="seq.oct" data-label="OCT"></div>
-      <div class="knob" data-k="seq.swing" data-size="S" data-label="SWING"></div></div>
+      <div class="knob" data-k="seq.swing" data-size="S" data-label="SWING"></div>
+      <div class="knob" data-k="seq.accent" data-size="S" data-label="ACCENT"></div>
+      <div class="knob" data-k="seq.slide" data-size="S" data-label="SLIDE"></div></div>
       <div class="seqbox"><button class="play" type="button" aria-pressed="false" aria-label="Tocar o sequencer"><svg viewBox="0 0 14 14"><path d="M2 1l11 6-11 6z"/></svg></button>
-      <div class="steps" role="grid" aria-label="Passos"></div></div>`;
+      <div class="steps" role="grid" aria-label="Passos"></div>
+      <span class="tlbl acc">ACCENT</span><div class="trow acc" data-lane="${L_ACC}" aria-label="Accent por passo"></div>
+      <span class="tlbl sld">SLIDE</span><div class="trow sld" data-lane="${L_SLIDE}" aria-label="Slide por passo"></div></div>`;
     const steps = $(".steps", host);
     steps.innerHTML = Array.from({ length: 16 }, (_, i) => `<div class="stp" data-i="${i}"><i></i><b></b></div>`).join("");
     host.lane = 0;
-    const st = { host, steps, cells: $$(".stp", steps), play: $(".play", host), last: -2 };
-    tabs($(".lanes", host), LANE_LABEL, (i) => { host.lane = i; renderSeq(st); dragLabels(); });
+    const st = { host, steps, cells: $$(".stp", steps), play: $(".play", host), last: -2, rows: [] };
+    $$(".trow", host).forEach((row) => {
+      const lane = +row.dataset.lane;
+      row.innerHTML = Array.from({ length: 16 }, (_, i) => `<button type="button" class="tc" data-i="${i}" aria-label="${LANES[lane]} ${i + 1}" aria-pressed="false"></button>`).join("");
+      const cells = $$(".tc", row);
+      st.rows.push({ lane, cells });
+      let painting = null, idr = null;                 /* tap toggles, a drag paints the same state */
+      const at = (e) => { const r = row.getBoundingClientRect(); return clamp(Math.floor(((e.clientX - r.left) / r.width) * 16), 0, 15); };
+      row.addEventListener("pointerdown", (e) => {
+        idr = e.pointerId;
+        row.setPointerCapture(idr);
+        const i = at(e);
+        painting = VALUES[seqId(i, lane)] > 0.5 ? 0 : 1;
+        set(seqId(i, lane), painting);
+      });
+      row.addEventListener("pointermove", (e) => { if (e.pointerId === idr && painting !== null) set(seqId(at(e), lane), painting); });
+      row.addEventListener("pointerup", () => { idr = null; painting = null; });
+      row.addEventListener("keydown", (e) => {
+        const b = e.target.closest(".tc");
+        if (b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.stopPropagation(); const g = seqId(+b.dataset.i, lane); set(g, VALUES[g] > 0.5 ? 0 : 1); }
+      });
+    });
+    const lt = tabs($(".lanes", host), LANE_TABS.map((t) => t[1]), (i) => { host.lane = LANE_TABS[i][0]; renderSeq(st); dragLabels(); });
+    void lt;
     st.play.addEventListener("click", () => transport(!wantPlay));
     let idp = null, moved = false, downStep = -1, y0 = 0;
     const cellAt = (e) => {
@@ -1068,8 +1097,8 @@
     const paint = (e) => {
       const [i, v] = cellAt(e), lane = host.lane;
       let x = v;
-      if (lane === 1) x = Math.round(v * 24 - 12);
-      else if (lane === 0 && v < 0.06) x = 0;
+      if (lane === L_NOTE) x = Math.round(v * 24 - 12);
+      else if (lane === L_GATE && v < 0.06) x = 0;
       set(seqId(i, lane), x);
     };
     steps.addEventListener("pointerdown", (e) => {
@@ -1097,10 +1126,10 @@
     const lane = st.host.lane, len = val("seq.len");
     st.cells.forEach((c, i) => {
       const v = VALUES[seqId(i, lane)], bar = $("i", c), b = $("b", c);
-      c.classList.toggle("bip", lane === 1);
-      c.classList.toggle("zero", lane === 1);
+      c.classList.toggle("bip", lane === L_NOTE);
+      c.classList.toggle("zero", lane === L_NOTE);
       c.classList.toggle("out", i >= len);
-      if (lane === 1) {
+      if (lane === L_NOTE) {
         const h = (clamp(v, -12, 12) / 12) * 50;
         bar.style.bottom = h >= 0 ? "50%" : 50 + h + "%";
         bar.style.top = "auto";
@@ -1115,6 +1144,11 @@
         bar.style.opacity = lane === 0 || VALUES[seqId(i, 0)] > 0 ? "" : ".35";
       }
     });
+    st.rows.forEach(({ lane, cells }) => cells.forEach((c, i) => {
+      c.setAttribute("aria-pressed", VALUES[seqId(i, lane)] > 0.5 ? "true" : "false");
+      c.classList.toggle("out", i >= len);
+      c.classList.toggle("rest", !(VALUES[seqId(i, 0)] > 0));
+    }));
   }
   function transport(play) {
     wantPlay = play;
@@ -1266,7 +1300,7 @@
   function patchNow() {
     const p = {}, s = {};
     for (let i = 0; i < SEQ0; i++) if (Math.abs(VALUES[i] - DEFS[i]) > 1e-7) p[P[i].key] = +VALUES[i].toPrecision(6);
-    for (let l = 0; l < 8; l++) {
+    for (let l = 0; l < NL; l++) {
       const arr = [];
       let diff = false;
       for (let i = 0; i < 16; i++) { const v = VALUES[seqId(i, l)]; arr.push(+v.toPrecision(4)); if (v !== LANE_DEF[l]) diff = true; }
@@ -1435,7 +1469,10 @@
       mr().style.height = db(UI[3]);
       const step = UI[1] ? UI[0] : -1;
       if (step !== lastStep) {
-        SEQS.forEach((s) => s.cells.forEach((c, i) => c.classList.toggle("now", i === step)));
+        SEQS.forEach((s) => {
+          s.cells.forEach((c, i) => c.classList.toggle("now", i === step));
+          s.rows.forEach((r) => r.cells.forEach((c, i) => c.classList.toggle("now", i === step)));
+        });
         lastStep = step;
       }
       if (UI[1] !== lastPlaying) {
@@ -1459,13 +1496,14 @@
   function setup() {
     P = INFO.params;
     SEQ0 = INFO.seqBase;
+    NL = INFO.lanes;
     NALL = SEQ0 + INFO.steps * INFO.lanes;
     NSRC = INFO.sources.length;
     INFO.frames = X.s1_wt_frames();
     P.forEach((p) => { BYKEY[p.key] = p; });
     DEFS = new Float64Array(NALL);
     P.forEach((p) => { DEFS[p.id] = p.def; });
-    for (let s = 0; s < 16; s++) for (let l = 0; l < 8; l++) DEFS[seqId(s, l)] = LANE_DEF[l];
+    for (let s = 0; s < 16; s++) for (let l = 0; l < NL; l++) DEFS[seqId(s, l)] = LANE_DEF[l];
     VALUES = DEFS.slice();
     INFO.dests.forEach((d, i) => { if (d.key && d.key !== "pitch") DKEY[d.key] = i; });
     ["a", "b", "c"].forEach((o) => { DKEY[`osc.${o}.semi`] = INFO.dests.findIndex((d) => d.name === `OSC ${o.toUpperCase()} PITCH`); });
@@ -1488,7 +1526,7 @@
     LFOS.forEach(lfoWire);
     $$(".mtabs [data-lit]").forEach((b) => on(id(b.dataset.lit), (v) => b.classList.toggle("lit", !!v)));
     on(id("seq.len"), () => SEQS.forEach(renderSeq));
-    for (let s = 0; s < 16; s++) for (let l = 0; l < 8; l++) on(seqId(s, l), () => later(() => SEQS.forEach(renderSeq)));
+    for (let s = 0; s < 16; s++) for (let l = 0; l < NL; l++) on(seqId(s, l), () => later(() => SEQS.forEach(renderSeq)));
     $$(".drag[data-src]").forEach(dragSource);
     dragLabels();
     keyWire();

@@ -17,7 +17,7 @@ X.s1_init(48000);
 const cstr = (p) => { const m = new Uint8Array(X.memory.buffer); let e = p; while (m[e]) e++; return new TextDecoder().decode(m.subarray(p, e)); };
 const INFO = JSON.parse(cstr(X.s1_info()));
 const BYKEY = Object.fromEntries(INFO.params.map((p) => [p.key, p]));
-const LANES = ["gate", "note", "velo", "prob", "m1", "m2", "m3", "m4"];
+const LANES = ["gate", "note", "velo", "accent", "slide", "prob", "m1", "m2", "m3", "m4"];
 const SR = 48000;
 
 function apply(pr) {
@@ -32,7 +32,7 @@ function apply(pr) {
   });
   for (const ln in pr.s || {}) {
     const l = LANES.indexOf(ln);
-    pr.s[ln].forEach((v, i) => X.s1_set(INFO.seqBase + i * 8 + l, v));
+    pr.s[ln].forEach((v, i) => X.s1_set(INFO.seqBase + i * INFO.lanes + l, v));
   }
 }
 function render(secs, L, R, at) {

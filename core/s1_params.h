@@ -44,7 +44,8 @@ static const float ARPRATE_BEATS[] = {1.f, 0.5f, 1.f / 3.f, 0.25f, 1.f / 6.f, 0.
     S(SRC_LFO1, "LFO 1") S(SRC_LFO2, "LFO 2") S(SRC_LFO3, "LFO 3") S(SRC_VELO, "VELO") S(SRC_KEY, "KEY") \
     S(SRC_MODWH, "MOD WH") S(SRC_AFTER, "AFTERTOUCH") S(SRC_BEND, "BEND") \
     S(SRC_MAC1, "MACRO 1") S(SRC_MAC2, "MACRO 2") S(SRC_MAC3, "MACRO 3") S(SRC_MAC4, "MACRO 4") \
-    S(SRC_RAND, "RANDOM") S(SRC_SEQ1, "SEQ MOD 1") S(SRC_SEQ2, "SEQ MOD 2") S(SRC_SEQ3, "SEQ MOD 3") S(SRC_SEQ4, "SEQ MOD 4")
+    S(SRC_RAND, "RANDOM") S(SRC_SEQ1, "SEQ MOD 1") S(SRC_SEQ2, "SEQ MOD 2") S(SRC_SEQ3, "SEQ MOD 3") S(SRC_SEQ4, "SEQ MOD 4") \
+    S(SRC_ACCENT, "ACCENT")
 
 #define S1_OSC_PARAMS(X, L, l, DON, DMODE, DWAVE) \
     X(P_OSC##L##_ON, "osc." l ".on", "OSC " #L, K_BOOL, 0, 1, DON, O_ONOFF) \
@@ -76,7 +77,7 @@ static const float ARPRATE_BEATS[] = {1.f, 0.5f, 1.f / 3.f, 0.25f, 1.f / 6.f, 0.
     X(P_LFO##N##_SMOOTH, "lfo" n ".smooth", "SMOOTH", K_LIN, 0, 1, 0, O_NONE)
 
 #define S1_MOD_PARAMS(X, N, n) \
-    X(P_MOD##N##_SRC, "mod" n ".src", "SOURCE", K_ENUM, 0, 20, 0, O_NONE) \
+    X(P_MOD##N##_SRC, "mod" n ".src", "SOURCE", K_ENUM, 0, 21, 0, O_NONE) \
     X(P_MOD##N##_DST, "mod" n ".dst", "DEST", K_ENUM, 0, 63, 0, O_NONE) \
     X(P_MOD##N##_AMT, "mod" n ".amt", "AMOUNT", K_BIP, -1, 1, 0, O_NONE)
 
@@ -155,6 +156,8 @@ static const float ARPRATE_BEATS[] = {1.f, 0.5f, 1.f / 3.f, 0.25f, 1.f / 6.f, 0.
     X(P_SEQ_DIR, "seq.dir", "DIRECTION", K_ENUM, 0, 3, 0, O_SEQDIR) \
     X(P_SEQ_OCT, "seq.oct", "OCT", K_INT, -2, 2, 0, O_NONE) \
     X(P_SEQ_SWING, "seq.swing", "SWING", K_LIN, 0, 0.6f, 0, O_NONE) \
+    X(P_SEQ_ACC, "seq.accent", "ACCENT", K_LIN, 0, 1, 0.6f, O_NONE) \
+    X(P_SEQ_SLIDE, "seq.slide", "SLIDE", K_EXP, 0.01f, 0.5f, 0.06f, O_NONE) \
     X(P_ARP_ON, "arp.on", "ARP", K_BOOL, 0, 1, 0, O_ONOFF) \
     X(P_ARP_MODE, "arp.mode", "MODE", K_ENUM, 0, 5, 0, O_ARPMODE) \
     X(P_ARP_RATE, "arp.rate", "RATE", K_ENUM, 0, 5, 3, O_ARPRATE) \
@@ -167,9 +170,12 @@ static const float ARPRATE_BEATS[] = {1.f, 0.5f, 1.f / 3.f, 0.25f, 1.f / 6.f, 0.
 #define S1_P_ENUM(id, key, label, kind, mn, mx, def, opts) id,
 enum { S1_PARAMS(S1_P_ENUM) S1_NPARAM };
 
-/* the sequencer's steps: 16 x 8 lanes after the parameters (ids S1_NPARAM ..) */
+/* the sequencer's steps: 16 x 10 lanes after the parameters (ids S1_NPARAM ..). ACCENT and SLIDE work as on
+ * a TB-303: an accented step is louder and opens the filter (more with RESONANCE, more again on accents in a
+ * row); a step with SLIDE holds its note into the next step, which glides there without a new attack */
 #define S1_STEPS 16
-enum { LANE_GATE, LANE_NOTE, LANE_VELO, LANE_PROB, LANE_M1, LANE_M2, LANE_M3, LANE_M4, S1_LANES };
+enum { LANE_GATE, LANE_NOTE, LANE_VELO, LANE_ACC, LANE_SLIDE, LANE_PROB, LANE_M1, LANE_M2, LANE_M3, LANE_M4, S1_LANES };
+static const float LANE_DEF[S1_LANES] = {0, 0, 0.8f, 0, 0, 1, 0, 0, 0, 0};
 #define S1_SEQ_ID(step, lane) (S1_NPARAM + (step) * S1_LANES + (lane))
 #define S1_NALL (S1_NPARAM + S1_STEPS * S1_LANES)
 
