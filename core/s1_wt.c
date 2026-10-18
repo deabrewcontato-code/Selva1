@@ -73,7 +73,6 @@ static void s1_fft(float *re, float *im, int n, int inverse)
 }
 
 /* ------------------------------------------------------------------- the frames --- */
-static float wt_cycle[WT_GEN];
 static float spec_re[1025], spec_im[1025];        /* the frame's harmonics 0..1024 */
 
 static inline float frac01(float x) { return x - s1_floor(x); }
@@ -272,6 +271,13 @@ static void wt_init(void)
     for (k = 0; k < WTK_COUNT; k++)
         wt_slot[k] = -1;
     wt_used = 0;
+}
+/* every table, built now (a plugin does this once, before its audio runs) */
+static void wt_build_all(void)
+{
+    int k;
+    for (k = 0; k < WTK_COUNT; k++)
+        wt_table(k);
 }
 
 /* the level whose harmonics all sit under Nyquist for an increment of inc cycles a sample */

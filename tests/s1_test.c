@@ -149,7 +149,7 @@ static void tails(void)
     {
         int i, n = 0;
         for (i = 0; i < MAXV; i++)
-            n += V[i].active;
+            n += s1_cur->V[i].active;
         CHECK(n == 0, "release: %d voices still active", n);
     }
 }
@@ -229,12 +229,12 @@ static void slide_accent(void)
     set("seq.len", 2);
     s1_transport(1);
     render(n + 600);                          /* into step 2 by 600 samples */
-    mid = V[0].pitch;
-    CHECK(V[0].active && V[0].gate, "slide: the note did not hold into the next step");
+    mid = s1_cur->V[0].pitch;
+    CHECK(s1_cur->V[0].active && s1_cur->V[0].gate, "slide: the note did not hold into the next step");
     CHECK(mid > 48.5f && mid < 59.5f, "slide: pitch %.2f is not between the two notes (gliding)", mid);
-    CHECK(V[0].env[0].stage != 1, "slide: the envelope started a new attack");
+    CHECK(s1_cur->V[0].env[0].stage != 1, "slide: the envelope started a new attack");
     render(n - 1200);
-    CHECK(fabsf(V[0].pitch - 60.f) < 0.5f, "slide: did not arrive (%.2f)", V[0].pitch);
+    CHECK(fabsf(s1_cur->V[0].pitch - 60.f) < 0.5f, "slide: did not arrive (%.2f)", s1_cur->V[0].pitch);
     s1_transport(0);
     printf("s1: slide: 600 samples after the step, the pitch is at %.2f on its way from 48 to 60, no new attack\n", mid);
     /* accent: the same two notes, the first accented; compare their loudness */
@@ -255,6 +255,30 @@ static void slide_accent(void)
     s1_transport(0);
     CHECK(a0 > a1 * 1.3f, "accent: the accented step is not louder (%.4f vs %.4f)", a0, a1);
     printf("s1: accent: the accented step %+.1f dB over the plain one\n", 20.f * log10f(a0 / a1));
+}
+
+/* two instances side by side give each the same sound as alone (the plugin runs several in one DAW) */
+static void instances(void)
+{
+    static float la[4800], ra[4800], lb[4800], rb[4800], ls[4800], rs[4800];
+    void *A = calloc(1, s1_ctx_size()), *B = calloc(1, s1_ctx_size());
+    int i, diff = 0;
+    s1_bind(A); s1_init(48000); set("osc.a.mode", 0); set("osc.a.table", 3); set("fx.rev.on", 1); s1_note_on(48, 100);
+    s1_bind(B); s1_init(48000); set("osc.a.wave", 1); set("flt.cutoff", 500); s1_note_on(67, 90);
+    for (i = 0; i < 4800; i += 128) {
+        int m = 4800 - i < 128 ? 4800 - i : 128;
+        s1_bind(A); s1_render(la + i, ra + i, m);
+        s1_bind(B); s1_render(lb + i, rb + i, m);
+    }
+    s1_bind(A); s1_init(48000); set("osc.a.mode", 0); set("osc.a.table", 3); set("fx.rev.on", 1); s1_note_on(48, 100);
+    for (i = 0; i < 4800; i += 128)
+        s1_render(ls + i, rs + i, 4800 - i < 128 ? 4800 - i : 128);
+    for (i = 0; i < 4800; i++)
+        diff += la[i] != ls[i] || ra[i] != rs[i];
+    CHECK(!diff, "instances: %d samples differ when another instance runs between", diff);
+    printf("s1: instances: two engines interleaved, each identical to running alone (%d bytes of state each)\n", s1_ctx_size());
+    free(A); free(B);
+    s1_bind(&s1_default);
 }
 
 static void cost(void)
@@ -296,6 +320,7 @@ int main(int argc, char **argv)
     tuning();
     sequencer();
     slide_accent();
+    instances();
     cost();
     /* a short demo: a chord through each wavetable */
     {

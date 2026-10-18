@@ -82,10 +82,14 @@ static inline float s1_tanpi(float x)
 }
 
 /* the table: sin by its Taylor series in double, the angle first brought into [-pi, pi] (no libm) */
+static int s1_math_ready;
 static void s1_math_init(void)
 {
     const double PI = 3.14159265358979323846;
     int i, k;
+    if (s1_math_ready)
+        return;
+    s1_math_ready = 1;
     for (i = 0; i <= S1_SIN_N; i++) {
         double x = 2.0 * PI * (double)i / (double)S1_SIN_N, s = 0, term;
         if (x > PI)
