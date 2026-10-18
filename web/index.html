@@ -1,0 +1,468 @@
+<title>Selva1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Selva1: urban synthesis system. Synth da DeAbrew inspirado na selva de pedra de São Paulo.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=DM+Mono:wght@400;500&family=Inter:wght@400;600&display=swap">
+<style>
+/* Layout: one instrument faceplate, the modules in signal order (three oscillators across the top; filter,
+   envelopes, LFOs and the matrix under them; amp, noise, sub, FX and macros; then the sequencer and the arp),
+   a keyboard strip at the foot for the web. Wider than 1180 px: the reference's grid; narrower: two columns,
+   then one. A single dark look on purpose: it is a machine in a dark room. */
+:root {
+  color-scheme: dark;
+  --room: #0d0d0c;
+  --plate: #141414;          /* preto usina */
+  --panel: #1a1918;
+  --panel-hi: #211f1d;
+  --inset: #0a0a09;
+  --line: #2b2926;
+  --line-hi: #3b3834;
+  --cream: #F2E9D5;
+  --cream-3: #EBE4DA;
+  --concrete: #8C8782;
+  --red: #C63F3E;            /* the one signal */
+  --red-text: #E85B4F;
+  --kraft: #BFA27A;          /* modulation, tape, paper */
+  --rust: #8B4A2B;
+  --display: "Anton", "Oswald", "Impact", "Arial Narrow", sans-serif;
+  --mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .91 0 0 0 0 .83 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --dust: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='300'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.009' numOctaves='5' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 .75 0 0 0 0 .64 0 0 0 0 .48 0 0 0 .9 -.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)'/%3E%3C/svg%3E");
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--room); color: var(--cream); }
+body {
+  margin: 0; font-family: var(--mono); font-size: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 28px;
+}
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--red-text); outline-offset: 2px; }
+
+/* the faceplate */
+.plate {
+  max-width: 1500px; margin: 0 auto; position: relative;
+  background-color: var(--plate); background-image: var(--dust), var(--grain);
+  background-blend-mode: soft-light, overlay;
+  border: 1px solid #2a2826; padding: 14px 16px 18px; display: grid; gap: 12px;
+}
+.screw { position: absolute; width: 11px; height: 11px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #a9a296, #5d5850 60%, #34312d); box-shadow: inset 0 0 0 1px #1c1b19; }
+.screw::after { content: ""; position: absolute; left: 1.5px; right: 1.5px; top: 4.75px; height: 1.5px; background: #22201d; transform: rotate(var(--r, 30deg)); }
+.screw.tl { top: 6px; left: 6px; } .screw.tr { top: 6px; right: 6px; --r: -20deg; }
+.screw.bl { bottom: 6px; left: 6px; --r: 75deg; } .screw.br { bottom: 6px; right: 6px; --r: 10deg; }
+
+/* header */
+.head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 6px 10px 12px;
+  border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.word { font-family: var(--display); font-size: 64px; line-height: .86; letter-spacing: .005em; color: var(--cream); margin: 0;
+  text-transform: uppercase; font-weight: 400; }
+.word b { color: var(--red); font-weight: 400; }
+.tag { border-left: 1px solid var(--line-hi); padding-left: 14px; font-size: 11px; letter-spacing: .2em; line-height: 1.55; color: var(--cream-3); }
+.pbar { display: grid; gap: 4px; justify-self: center; width: min(560px, 100%); min-width: 0; }
+.pbox { display: grid; grid-template-columns: 40px minmax(0, 1fr) 36px 40px; border: 1px solid var(--line-hi); background: var(--inset); height: 42px; }
+.pbox button { background: none; border: 0; cursor: pointer; color: var(--cream-3); font-size: 18px; }
+.pbox button:hover { color: var(--cream); background: #151413; }
+.pname { display: flex; align-items: center; gap: 14px; padding: 0 12px; border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+  min-width: 0; cursor: pointer; position: relative; }
+.pname .num { color: var(--concrete); font-size: 15px; font-variant-numeric: tabular-nums; }
+.pname .nm { font-size: 17px; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pname select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.heart svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.heart[aria-pressed="true"] svg { fill: var(--red); stroke: var(--red); }
+.pmeta { display: flex; justify-content: space-between; gap: 10px; color: var(--concrete); font-size: 11px; letter-spacing: .14em; flex-wrap: wrap; }
+.pmeta .acts { display: flex; gap: 2px; }
+.pmeta button { background: none; border: 0; color: var(--concrete); letter-spacing: .14em; cursor: pointer; padding: 3px 8px; font-size: 11px; }
+.pmeta button:hover { color: var(--cream); }
+.right { display: grid; justify-items: end; gap: 6px; }
+.dab { font-size: 15px; letter-spacing: .32em; color: var(--cream); font-weight: 500; }
+.ver { font-size: 10px; color: var(--concrete); letter-spacing: .18em; }
+.power { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line-hi); background: var(--panel); padding: 7px 12px;
+  cursor: pointer; letter-spacing: .16em; font-size: 11px; }
+.power i { width: 9px; height: 9px; border-radius: 50%; background: #3a1716; box-shadow: inset 0 0 0 1px #000; }
+.power.on { border-color: var(--red); }
+.power.on i { background: var(--red); }
+
+/* tabs and the voice strip */
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.tabs { display: flex; flex-wrap: wrap; border: 1px solid var(--line); }
+.tabs button { background: var(--panel); border: 0; border-right: 1px solid var(--line); padding: 11px 26px; cursor: pointer; letter-spacing: .14em;
+  font-size: 13px; color: var(--cream-3); position: relative; }
+.tabs button:last-child { border-right: 0; }
+.tabs button[aria-selected="true"] { color: var(--red-text); background: var(--panel-hi); }
+.tabs button[aria-selected="true"]::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--red); }
+.vstrip { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); padding: 4px 12px; flex-wrap: wrap; }
+.vstrip .lbl { color: var(--concrete); letter-spacing: .14em; font-size: 11px; }
+
+/* modules */
+.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; }
+.mod { background-color: var(--panel); background-image: var(--grain); background-blend-mode: overlay; border: 1px solid var(--line);
+  padding: 10px 12px 12px; display: grid; gap: 10px; align-content: start; min-width: 0; position: relative; }
+.mod::after { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: var(--dust); opacity: .4; mix-blend-mode: soft-light; }
+.mh { display: flex; align-items: center; gap: 10px; min-height: 30px; flex-wrap: wrap; position: relative; z-index: 1; }
+.mh h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 25px; line-height: 1; letter-spacing: .02em; text-transform: uppercase; }
+.mh .no { font-family: var(--display); font-size: 34px; line-height: .9; padding-right: 12px; border-right: 1px solid var(--line-hi); }
+.mh .sp { flex: 1; }
+.mod > *:not(.mh) { position: relative; z-index: 1; }
+.c4 { grid-column: span 4; } .c3 { grid-column: span 3; } .c2 { grid-column: span 2; } .c5 { grid-column: span 5; }
+.c6 { grid-column: span 6; } .c7 { grid-column: span 7; } .c8 { grid-column: span 8; } .c9 { grid-column: span 9; } .c12 { grid-column: span 12; }
+
+.led { width: 26px; height: 18px; border: 1px solid var(--line-hi); background: var(--inset); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.led::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #3a1716; }
+.led[aria-pressed="true"]::before { background: var(--red); }
+.mod.off .body { opacity: .38; }
+
+.mtabs { display: inline-flex; border: 1px solid var(--line); background: var(--inset); flex-wrap: wrap; }
+.mtabs button { background: none; border: 0; padding: 5px 10px; cursor: pointer; color: var(--concrete); font-size: 11px; letter-spacing: .1em;
+  border-right: 1px solid var(--line); }
+.mtabs button:last-child { border-right: 0; }
+.mtabs button[aria-selected="true"], .mtabs button[aria-pressed="true"] { color: var(--red-text); box-shadow: inset 0 -2px 0 var(--red); background: #121110; }
+
+.seg { display: inline-flex; border: 1px solid var(--line); background: var(--inset); flex-wrap: wrap; }
+.seg button { background: none; border: 0; padding: 5px 9px; cursor: pointer; color: var(--concrete); font-size: 11px; letter-spacing: .08em;
+  border-right: 1px solid var(--line); min-width: 30px; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--red); color: var(--cream); }
+.seg svg { width: 20px; height: 12px; display: block; fill: none; stroke: currentColor; stroke-width: 1.5; }
+
+select.sel { background: var(--inset); border: 1px solid var(--line-hi); padding: 6px 28px 6px 9px; font-size: 12px; letter-spacing: .08em;
+  -webkit-appearance: none; appearance: none; color: var(--cream-3); cursor: pointer; min-width: 0; max-width: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23EBE4DA' fill='none' stroke-width='1.4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center; }
+select.sel option { background: #161514; color: var(--cream); }
+
+.ctl { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 10px; }
+.lbl { font-size: 10px; letter-spacing: .14em; color: var(--concrete); text-transform: uppercase; }
+
+/* the knob */
+.knob { display: grid; justify-items: center; gap: 1px; cursor: ns-resize; user-select: none; touch-action: none; position: relative; min-width: 44px; }
+.knob svg { display: block; overflow: visible; }
+.knob .kl { font-size: 10px; letter-spacing: .12em; color: var(--cream-3); text-transform: uppercase; white-space: nowrap; }
+.knob .kv { font-size: 10px; color: var(--concrete); font-variant-numeric: tabular-nums; white-space: nowrap; min-height: 13px; }
+.knob:hover .kv, .knob.drag .kv { color: var(--cream); }
+.knob.drop { outline: 1px dashed var(--kraft); outline-offset: 2px; }
+
+/* steppers: OCT, SEMI, UNISON */
+.stepper { display: grid; justify-items: center; gap: 3px; }
+.stepper .box { width: 38px; height: 30px; border: 1px solid var(--line-hi); background: var(--inset); display: grid; place-items: center;
+  font-size: 13px; color: var(--cream); cursor: ns-resize; user-select: none; touch-action: none; font-variant-numeric: tabular-nums; }
+
+/* displays */
+.screen { background: var(--inset); border: 1px solid var(--line); position: relative; overflow: hidden; }
+.screen canvas { display: block; width: 100%; }
+.screen .cap { position: absolute; left: 10px; bottom: 7px; font-size: 13px; letter-spacing: .1em; color: var(--cream-3); text-transform: uppercase;
+  pointer-events: none; }
+.screen .cap span { color: var(--concrete); margin-right: 10px; }
+.screen .nav { position: absolute; top: 0; bottom: 0; width: 34px; background: none; border: 0; color: var(--cream-3); font-size: 20px; cursor: pointer; }
+.screen .nav:hover { background: rgba(255,255,255,.03); color: var(--cream); }
+.screen .nav.l { left: 0; } .screen .nav.r { right: 0; }
+.screen .tr { position: absolute; top: 8px; right: 40px; }
+
+.oscrow { display: flex; flex-wrap: wrap; justify-content: space-around; gap: 6px 4px; align-items: flex-end; }
+.oscgrid { display: grid; grid-template-columns: minmax(78px, 1.25fr) repeat(4, minmax(0, 1fr)); gap: 8px 4px; align-items: end; justify-items: center; }
+.oscgrid .big { grid-row: span 2; align-self: center; }
+
+/* the matrix */
+.mx { display: grid; gap: 4px; }
+.mxr { display: grid; grid-template-columns: 22px minmax(0, 1fr) 10px minmax(0, 1.4fr) 64px; gap: 6px; align-items: center; }
+.mxr .i { font-size: 11px; color: var(--concrete); border: 1px solid var(--line); text-align: center; padding: 3px 0; }
+.mxr .ar { color: var(--concrete); text-align: center; }
+.mxr select.sel { padding: 3px 18px 3px 5px; font-size: 10px; letter-spacing: .03em; background-position: right 5px center; }
+.amt { height: 18px; background: var(--inset); border: 1px solid var(--line); position: relative; cursor: ew-resize; touch-action: none; }
+.amt i { position: absolute; top: 3px; bottom: 3px; background: var(--red); }
+.amt::before { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 1px; background: var(--line-hi); }
+.amt span { position: absolute; right: 4px; top: 1px; font-size: 10px; color: var(--cream-3); pointer-events: none; }
+
+/* sequencer */
+.seqbox { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; align-items: stretch; }
+.play { background: var(--inset); border: 1px solid var(--line-hi); cursor: pointer; display: grid; place-items: center; }
+.play svg { width: 14px; height: 14px; fill: var(--cream); }
+.play[aria-pressed="true"] { border-color: var(--red); }
+.play[aria-pressed="true"] svg { fill: var(--red); }
+.steps { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 2px; height: 74px; background: var(--inset); border: 1px solid var(--line);
+  padding: 4px; cursor: crosshair; touch-action: none; user-select: none; }
+.stp { position: relative; background: #141312; }
+.stp:nth-child(4n+1) { box-shadow: inset 1px 0 0 var(--line-hi); }
+.stp i { position: absolute; left: 1px; right: 1px; bottom: 0; background: var(--red); opacity: .85; }
+.stp.bip i { bottom: auto; }
+.stp.zero::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line-hi); }
+/*now*/
+.stp.out { opacity: .3; }
+.stp b { position: absolute; left: 0; right: 0; top: 2px; text-align: center; font-weight: 400; font-size: 9px; color: var(--concrete); pointer-events: none; }
+.seqctl { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.seqbig .steps { height: 150px; }
+
+/* keyboard */
+.kbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; padding: 4px 2px; }
+.kbar .g { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.kbar button { background: var(--panel); border: 1px solid var(--line-hi); padding: 6px 11px; cursor: pointer; font-size: 11px; letter-spacing: .12em; }
+.kbar button[aria-pressed="true"] { border-color: var(--red); color: var(--red-text); }
+.hint { color: var(--concrete); font-size: 11px; }
+.kscroll { overflow-x: auto; background: #080808; border: 1px solid var(--line); padding: 8px 8px 10px; }
+.keys { position: relative; height: 112px; display: flex; min-width: 820px; touch-action: none; user-select: none; }
+.wk { flex: 1 1 0; background: linear-gradient(#ece3cf, #d8ccb4); border: 1px solid #6f6658; border-top: 0; margin-right: 2px;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px; font-size: 9px; color: #6e6456; }
+.wk:last-child { margin-right: 0; }
+.bk { position: absolute; top: 0; height: 60%; background: linear-gradient(#262422, #0c0b0a); border: 1px solid #000; z-index: 2;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; font-size: 9px; color: #6e6456; }
+.wk.down { background: linear-gradient(#e46a5f, var(--red)); color: var(--cream); }
+.bk.down { background: var(--red); }
+
+.foot { color: var(--concrete); font-size: 11px; line-height: 1.6; max-width: 1500px; margin: 10px auto 0; font-family: var(--body); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: #1d1b19;
+  border: 1px solid var(--line-hi); padding: 8px 14px; font-size: 12px; z-index: 30; max-width: calc(100% - 32px); }
+.inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.inline input { background: var(--inset); border: 1px solid var(--line-hi); padding: 6px 8px; width: 190px; text-transform: uppercase; letter-spacing: .08em; }
+.page { display: grid; gap: 10px; }
+.fxrack { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.drag { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed var(--line-hi); padding: 2px 6px; cursor: grab; color: var(--kraft);
+  font-size: 10px; letter-spacing: .1em; touch-action: none; user-select: none; }
+.drag svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 1.4; }
+.ghost { position: fixed; z-index: 40; pointer-events: none; background: var(--kraft); color: #1a1714; padding: 3px 8px; font-size: 11px; letter-spacing: .1em; }
+.meter2 { display: flex; gap: 3px; height: 56px; align-items: stretch; }
+.meter2 div { width: 9px; background: var(--inset); border: 1px solid var(--line); position: relative; }
+.meter2 i { position: absolute; left: 1px; right: 1px; bottom: 1px; background: repeating-linear-gradient(0deg, var(--red) 0 3px, transparent 3px 5px); }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.chips .lbl { margin-right: 4px; }
+
+
+/* added controls */
+#macros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+
+#mxfull .mxr { grid-template-columns: 30px minmax(0, 240px) 18px minmax(0, 280px) minmax(140px, 1fr); gap: 8px; }
+#mxfull .mxr select.sel { font-size: 11px; padding: 5px 22px 5px 8px; }
+#mxfull .amt { height: 24px; }
+.stp.now { background: #2a1513; }
+.stp.now::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--cream); z-index: 1; }
+.stp.now i { filter: brightness(1.35); }
+
+.seg1 { background: var(--inset); border: 1px solid var(--line-hi); color: var(--concrete); padding: 4px 8px; font-size: 10px; letter-spacing: .1em; cursor: pointer; }
+.seg1[aria-pressed="true"] { color: var(--cream); border-color: var(--red); box-shadow: inset 0 -2px 0 var(--red); }
+.stack { display: grid; gap: 4px; justify-items: start; }
+.knob.dim svg { opacity: .35; }
+.mtabs button.lit { position: relative; }
+.mtabs button.lit::after { content: ""; position: absolute; top: 3px; right: 3px; width: 4px; height: 4px; background: var(--red); }
+.mac { display: grid; justify-items: center; gap: 6px; }
+.screen .tr { display: flex; gap: 6px; align-items: center; }
+.screen .tr.lbl, .screen .tr .lbl { color: var(--concrete); }
+.screen .tr.lbl { right: 10px; }
+.screen .tr select.sel { padding: 3px 22px 3px 7px; font-size: 11px; background-position: right 6px center; }
+.screen .cap b { font-weight: 400; color: var(--cream); }
+.oscscreen .cap { left: 40px; }
+.seqctl .stack select.sel { padding: 4px 24px 4px 7px; font-size: 11px; }
+.lanes button { padding: 5px 8px; }
+.seqbig .seqbox { grid-template-columns: 44px minmax(0, 1fr); }
+.seqbig .stp b { font-size: 11px; top: 4px; }
+.keys .wk, .keys .bk { cursor: pointer; }
+
+@media (max-width: 1180px) {
+  .grid > .c4, .grid > .c3, .grid > .c2, .grid > .c5, .grid > .c7, .grid > .c8, .grid > .c9 { grid-column: span 6; }
+  .grid > .c12 { grid-column: span 12; }
+  .fxrack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .head { grid-template-columns: minmax(0, 1fr) auto; }
+  .pbar { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; width: auto; }
+}
+@media (max-width: 760px) {
+  .grid > * { grid-column: 1 / -1 !important; }
+  .word { font-size: 48px; }
+  .tag { display: none; }
+  .fxrack { grid-template-columns: minmax(0, 1fr); }
+  .tabs button { padding: 9px 12px; font-size: 11px; }
+  .plate { padding: 12px 10px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="plate" id="plate">
+  <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+  <header class="head">
+    <div class="brand">
+      <h1 class="word">Selva<b>1</b></h1>
+      <div class="tag">URBAN<br>SYNTHESIS<br>SYSTEM</div>
+    </div>
+    <div class="pbar">
+      <div class="pbox">
+        <button id="pprev" type="button" aria-label="Som anterior">&#8249;</button>
+        <div class="pname"><span class="num" id="pnum">001</span><span class="nm" id="pnm">INIT</span>
+          <select id="psel" aria-label="Escolher um som"></select></div>
+        <button class="heart" id="pfav" type="button" aria-pressed="false" aria-label="Favorito"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>
+        <button id="pnext" type="button" aria-label="Próximo som">&#8250;</button>
+      </div>
+      <div class="pmeta">
+        <span id="pbank">BANK A / CONCRETE</span>
+        <span class="acts"><button id="pinit" type="button">INIT</button><button id="psave" type="button">SAVE</button>
+          <button id="psaveas" type="button">SAVE AS</button><button id="pmore" type="button" aria-label="Copiar ou colar patch">&middot;&middot;&middot;</button></span>
+      </div>
+      <form class="inline" id="saveform" hidden>
+        <input id="savename" maxlength="22" autocomplete="off" aria-label="Nome do som">
+        <button class="power" type="submit">GUARDAR</button><button class="power" type="button" id="savecancel">CANCELAR</button>
+      </form>
+      <div class="inline" id="moreform" hidden>
+        <button class="power" type="button" id="pcopy">COPIAR PATCH</button>
+        <input id="ppaste" placeholder="COLE UM PATCH AQUI" aria-label="Colar patch">
+      </div>
+    </div>
+    <div class="right">
+      <div class="dab">DEABREW</div>
+      <div class="ver">V 0.1.0</div>
+      <button class="power" id="power" type="button"><i></i><span id="powerlbl">LIGAR O SOM</span></button>
+    </div>
+  </header>
+
+  <div class="bar">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-page="synth">SYNTH</button>
+      <button role="tab" aria-selected="false" data-page="fx">FX</button>
+      <button role="tab" aria-selected="false" data-page="matrix">MATRIX</button>
+      <button role="tab" aria-selected="false" data-page="seq">SEQUENCER</button>
+      <button role="tab" aria-selected="false" data-page="global">GLOBAL</button>
+    </div>
+    <div class="vstrip">
+      <div class="seg" data-k="voice.mode"></div>
+      <span class="lbl">VOICES</span><select class="sel" data-k="voice.count" aria-label="Vozes"></select>
+      <div class="knob" data-k="voice.glide" data-size="S" data-label="GLIDE"></div>
+    </div>
+  </div>
+
+  <!-- SYNTH -->
+  <section class="page" data-page="synth">
+    <div class="grid">
+      <!-- the three oscillators are built by the script from this one -->
+      <section class="mod c4 osc" data-osc="a"></section>
+      <section class="mod c4 osc" data-osc="b"></section>
+      <section class="mod c4 osc" data-osc="c"></section>
+
+      <section class="mod c3" data-power="flt.on" id="m-flt">
+        <div class="mh"><h2>Filter</h2><button class="led" data-k="flt.on" aria-label="Filtro ligado"></button>
+          <select class="sel" data-k="flt.type" aria-label="Tipo de filtro"></select><span class="sp"></span></div>
+        <div class="body page">
+          <div class="screen" id="fltscreen"><canvas id="fltc" height="120"></canvas></div>
+          <div class="oscrow">
+            <div class="knob" data-k="flt.cutoff" data-size="L" data-label="CUTOFF"></div>
+            <div class="knob" data-k="flt.res" data-label="RESONANCE"></div>
+            <div class="knob" data-k="flt.drive" data-label="DRIVE"></div>
+            <div class="knob" data-k="flt.key" data-size="S" data-label="KEY"></div>
+          </div>
+          <div class="ctl"><div class="seg" data-k="flt.slope"></div><div class="seg" data-k="flt.mode"></div>
+            <div class="chips"><span class="lbl">ENTRA</span><button class="seg1" data-k="flt.route.a">A</button></div></div>
+        </div>
+      </section>
+
+      <section class="mod c3" id="m-env">
+        <div class="mh"><h2>Env</h2><div class="mtabs" data-tabs="env"></div><span class="sp"></span><span class="drag" data-src="env"></span></div>
+        <div class="envbox"></div>
+      </section>
+
+      <section class="mod c3" id="m-lfo">
+        <div class="mh"><h2>LFO</h2><div class="mtabs" data-tabs="lfo"></div><span class="sp"></span><span class="drag" data-src="lfo"></span></div>
+        <div class="lfobox"></div>
+      </section>
+
+      <section class="mod c3" id="m-mx">
+        <div class="mh"><h2>Mod matrix</h2><span class="sp"></span><button class="power" type="button" data-goto="matrix">TODAS</button></div>
+        <div class="mx" id="mxshort"></div>
+      </section>
+
+      <section class="mod c2" id="m-amp">
+        <div class="mh"><h2>Amp</h2></div>
+        <div class="oscrow">
+          <div class="knob" data-k="amp.level" data-label="LEVEL"></div>
+          <div class="knob" data-k="amp.pan" data-label="PAN"></div>
+          <div class="meter2" aria-hidden="true"><div><i id="ml"></i></div><div><i id="mr"></i></div></div>
+        </div>
+      </section>
+
+      <section class="mod c2" data-power="noise.on">
+        <div class="mh"><h2>Noise</h2><button class="led" data-k="noise.on" aria-label="Ruído ligado"></button></div>
+        <div class="body page">
+          <select class="sel" data-k="noise.type" aria-label="Tipo de ruído"></select>
+          <div class="oscrow"><div class="knob" data-k="noise.level" data-label="LEVEL"></div><div class="knob" data-k="noise.color" data-label="COLOR"></div></div>
+        </div>
+      </section>
+
+      <section class="mod c2" data-power="sub.on">
+        <div class="mh"><h2>Sub</h2><button class="led" data-k="sub.on" aria-label="Sub ligado"></button></div>
+        <div class="body page">
+          <div class="ctl"><div class="seg" data-k="sub.wave" data-icons="sub"></div><div class="seg" data-k="sub.oct"></div></div>
+          <div class="oscrow"><div class="knob" data-k="sub.level" data-label="LEVEL"></div></div>
+        </div>
+      </section>
+
+      <section class="mod c3" id="m-fx">
+        <div class="mh"><h2>FX</h2><div class="mtabs" data-tabs="fx"></div></div>
+        <div class="fxbox"></div>
+      </section>
+
+      <section class="mod c3" id="m-mac">
+        <div class="mh"><h2>Macro</h2><span class="sp"></span><span class="hint">ARRASTE O &#8853; ATÉ UM KNOB</span></div>
+        <div class="oscrow" id="macros"></div>
+      </section>
+
+      <section class="mod c8" id="m-seq">
+        <div class="mh"><h2>Sequencer</h2><span class="sp"></span><span class="drag" data-src="seq"></span></div>
+        <div class="sequi"></div>
+      </section>
+
+      <section class="mod c4" id="m-arp">
+        <div class="mh"><h2>Arp</h2><button class="led" data-k="arp.on" aria-label="Arpejador ligado"></button><span class="sp"></span>
+          <button class="seg1" data-k="arp.hold">HOLD</button></div>
+        <div class="ctl"><select class="sel" data-k="arp.mode" aria-label="Modo do arpejador"></select><select class="sel" data-k="arp.rate" aria-label="Divisão do arpejador"></select></div>
+        <div class="oscrow">
+          <div class="knob" data-k="arp.oct" data-size="S" data-label="OCT"></div>
+          <div class="knob" data-k="arp.gate" data-size="S" data-label="GATE"></div>
+          <div class="knob" data-k="arp.swing" data-size="S" data-label="SWING"></div>
+          <div class="knob" data-k="arp.chance" data-size="S" data-label="CHANCE"></div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- FX -->
+  <section class="page" data-page="fx" hidden><div class="fxrack" id="fxrack"></div></section>
+  <!-- MATRIX -->
+  <section class="page" data-page="matrix" hidden>
+    <section class="mod c12"><div class="mh"><h2>Mod matrix</h2><span class="sp"></span><span class="hint">16 LIGAÇÕES · ORIGEM &#8594; DESTINO · ARRASTE A BARRA PARA A QUANTIDADE</span></div>
+      <div class="mx" id="mxfull"></div></section>
+  </section>
+  <!-- SEQUENCER -->
+  <section class="page" data-page="seq" hidden>
+    <section class="mod c12 seqbig"><div class="mh"><h2>Sequencer</h2><span class="sp"></span><span class="hint">CLIQUE E ARRASTE NOS PASSOS · A TECLA SEGURADA TRANSPÕE</span></div>
+      <div class="sequi"></div></section>
+  </section>
+  <!-- GLOBAL -->
+  <section class="page" data-page="global" hidden>
+    <div class="grid">
+      <section class="mod c6"><div class="mh"><h2>Global</h2></div>
+        <div class="oscrow">
+          <div class="knob" data-k="global.bpm" data-label="BPM"></div>
+          <div class="knob" data-k="global.tune" data-label="TUNE"></div>
+          <div class="knob" data-k="voice.bend" data-label="BEND RANGE"></div>
+          <div class="knob" data-k="voice.velo" data-label="VELOCITY"></div>
+        </div></section>
+      <section class="mod c6"><div class="mh"><h2>MIDI</h2></div>
+        <p class="hint" id="midistate">Procurando controladores MIDI…</p>
+        <p class="hint">Mod wheel (CC1), sustain (CC64), cutoff (CC74), pitch bend e aftertouch funcionam direto. Um FM-1 ligado no USB toca o Selva1 pelas teclas dele.</p></section>
+    </div>
+  </section>
+
+  <div class="kbar">
+    <div class="g"><button type="button" id="octdn">OCT &minus;</button><span id="octname">C3</span><button type="button" id="octup">OCT +</button>
+      <button type="button" id="holdk" aria-pressed="false">SEGURAR</button><button type="button" id="panic">PARAR</button></div>
+    <span class="hint">TECLADO DO COMPUTADOR: A W S E D F T G Y H U J K O L P Ç · Z / X OITAVA · ESPAÇO TOCA O SEQUENCER</span>
+  </div>
+  <div class="kscroll"><div class="keys" id="keys" aria-label="Teclado"></div></div>
+</div>
+<p class="foot">Selva1 é um sintetizador da DeAbrew. O motor é escrito em C e roda aqui em WebAssembly: o mesmo código vai virar plugin e uma versão leve vai para o M-VAVE FM-1. Os sons que você guarda ficam neste navegador.</p>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/*@PRESETS@*/
+/*@WORKLET@*/
+const WASM_B64 = "@WASM_B64@";
+/*@APP@*/
+</script>
