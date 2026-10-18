@@ -63,9 +63,9 @@ def app_files(out, version, fw_name):
     for f in ICONS:
         shutil.copy(HERE / f, app / f)
     manifest = {
-        "name": "SLOOP", "short_name": "SLOOP", "id": "editor/", "start_url": "editor/", "scope": "./",
+        "name": "Selva1 FM-1", "short_name": "Selva1", "id": "editor/", "start_url": "editor/", "scope": "./",
         "display": "standalone", "background_color": "#000000", "theme_color": "#000000",
-        "description": "SLOOP for the M-VAVE FM-1: the editor and the installer, also without internet",
+        "description": "Selva1 (SLOOP) for the M-VAVE FM-1: the installer and the editor, also without internet",
         "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
                   {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
                   {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}],
@@ -161,9 +161,9 @@ def main(pkg, version, out):
         (ed / dsp.name).unlink()  # never serve an old audio build as the current one
     app_files(out, version, name)
     (out / "index.html").write_text(
-        '<!doctype html><meta charset="utf-8"><title>SLOOP</title>'
+        '<!doctype html><meta charset="utf-8"><title>Selva1 para o FM-1</title>'
         '<meta http-equiv="refresh" content="0; url=webapp/installer/">'
-        '<a href="webapp/installer/">SLOOP installer</a>\n', encoding="utf-8")
+        '<a href="webapp/installer/">Instalador do Selva1 para o FM-1</a>\n', encoding="utf-8")
     print(f"site: {out}: webapp/installer ({len(html)} B), webapp/editor, firmware/{name} ({len(raw)} B, {product})")
 
 
