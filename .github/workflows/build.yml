@@ -56,6 +56,16 @@ jobs:
           for b in Selva1-mac/Selva1.component Selva1-mac/Selva1.vst3 Selva1-mac/Selva1.app; do codesign --force --deep --sign - "$b"; done
           cp plugin/INSTALAR-MAC.txt Selva1-mac/
           ditto -c -k --sequesterRsrc --keepParent Selva1-mac Selva1-mac.zip
+      - name: Validate (auval for the AU, pluginval for the VST3)
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R Selva1-mac/Selva1.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 3
+          auval -v aumu Slv1 Deab
+          curl -sSL -o pv.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_macOS.zip
+          unzip -q pv.zip
+          pluginval.app/Contents/MacOS/pluginval --strictness-level 5 --validate-in-process --skip-gui-tests Selva1-mac/Selva1.vst3
       - uses: actions/upload-artifact@v4
         with:
           name: Selva1-mac
